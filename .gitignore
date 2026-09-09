@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+.idea/
+1567个书源.json
+tools/validate/out/

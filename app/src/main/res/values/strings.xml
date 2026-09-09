@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">书源体检</string>
+    <string name="action_import">导入</string>
+    <string name="paste_import">粘贴 JSON</string>
+    <string name="file_import">选择文件</string>
+    <string name="start_check">开始检测</string>
+    <string name="stop_check">停止检测</string>
+    <string name="export">导出</string>
+    <string name="check_quick">快速检测</string>
+    <string name="check_standard">标准检测</string>
+    <string name="filter_all">全部</string>
+    <string name="filter_ok">可用</string>
+    <string name="filter_uncertain">疑似</string>
+    <string name="filter_dead">失效</string>
+    <string name="import_title">粘贴书源 JSON</string>
+    <string name="import_hint">支持直接粘贴“1567个书源.json”这类数组内容；也可以选择文件导入。</string>
+    <string name="start_confirm">开始批量检测</string>
+    <string name="start_message">共 %1$d 个书源。检测在后台进行，完成后可导出可用书源。\n\n快速检测：只检查站点/域名是否可达；\n标准检测：可达后还会尽量按搜索规则发出一次真实搜索请求，更准确但耗时更长。</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 低饱和主色，尽量安静 -->
+    <color name="brand_primary">#5A6672</color>
+    <color name="brand_dark">#414B54</color>
+    <color name="brand_light">#E9ECEF</color>
+    <color name="ok_green">#3E7A54</color>
+    <color name="ok_soft">#E6F1EA</color>
+    <color name="warn_orange">#A6651C</color>
+    <color name="warn_soft">#FAF0E2</color>
+    <color name="dead_red">#A8433C</color>
+    <color name="dead_soft">#F8E9E7</color>
+    <color name="neutral_gray">#6E747B</color>
+    <color name="text_primary">#212529</color>
+    <color name="text_secondary">#6E747B</color>
+    <color name="divider">#E9EBED</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="bg_window">#F7F8F9</color>
+    <color name="chip_selected">#E9ECEF</color>
+</resources>
