@@ -12,7 +12,8 @@ object AdultContentSniffer {
         "成人专区", "成人限定", "成人阅读", "成人频道",
         "色情小说", "色情漫画", "色情文学", "色情网站", "情色文学", "情色小说",
         "黄色小说", "小黄文", "黄文", "黄书", "肉文", "np文", "h漫", "里番",
-        "无码", "有码", "porn", "18禁", "十八禁", "av资源", "av在线"
+        "无码", "有码", "porn", "18禁", "十八禁", "av资源", "av在线",
+        "🔞", "po18", "腐小说", "腐文", "污书"
     )
 
     /** 弱特征：单独出现可能是广告或偶尔提及，至少命中两条才判定 */
@@ -21,8 +22,11 @@ object AdultContentSniffer {
         "大尺度", "限制级"
     )
 
-    /** 返回命中的特征词（最多 3 个）；没命中返回空列表。 */
-    fun hits(rawSample: String): List<String> {
+    /**
+     * 返回命中的特征词（最多 3 个）；没命中返回空列表。
+     * @param extraKeywords 用户自定义关键词，逗号/换行分隔；命中任意一个即视为成人。
+     */
+    fun hits(rawSample: String, extraKeywords: String = ""): List<String> {
         if (rawSample.isBlank()) return emptyList()
         val cleaned = rawSample
             .replace(Regex("<[^>]*>"), " ")
@@ -30,7 +34,15 @@ object AdultContentSniffer {
             .replace(Regex("\\s+"), " ")
             .lowercase()
         val strong = strongMarkers.filter { cleaned.contains(it) }
-        if (strong.isNotEmpty()) return strong.take(3)
+        val custom = extraKeywords
+            .split(Regex("[,，;；\n\r]+"))
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .filter { cleaned.contains(it) }
+            .distinct()
+        if (strong.isNotEmpty() || custom.isNotEmpty()) {
+            return (strong + custom).distinct().take(3)
+        }
         val weak = weakMarkers.filter { cleaned.contains(it) }
         return if (weak.size >= 2) weak.take(3) else emptyList()
     }

@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -518,11 +519,27 @@ class MainActivity : AppCompatActivity() {
         group.addView(quick)
         standard.isChecked = true
         container.addView(group)
-        val adultCheck = android.widget.CheckBox(this).apply {
+        val adultNote = TextView(this).apply {
             text = getString(R.string.start_adult_inspect)
-            isChecked = true
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setPadding(0, (resources.displayMetrics.density * 12).toInt(), 0, 0)
         }
-        container.addView(adultCheck)
+        container.addView(adultNote)
+        val customLabel = TextView(this).apply {
+            text = getString(R.string.start_custom_adult_keywords)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setPadding(0, (resources.displayMetrics.density * 8).toInt(), 0, 0)
+        }
+        container.addView(customLabel)
+        val customInput = EditText(this).apply {
+            hint = getString(R.string.start_custom_adult_hint)
+            textSize = 13f
+            minLines = 1
+            setPadding(0, (resources.displayMetrics.density * 4).toInt(), 0, 0)
+        }
+        container.addView(customInput)
         MaterialAlertDialogBuilder(this)
             .setTitle("开始批量检测")
             .setMessage("共 $count 个书源。检测会在前台通知中持续进行，期间请保持网络畅通。")
@@ -533,7 +550,8 @@ class MainActivity : AppCompatActivity() {
                     mode = mode,
                     timeoutSec = 12L,
                     concurrency = 12,
-                    adultInspect = adultCheck.isChecked
+                    adultInspect = true,
+                    customAdultKeywords = customInput.text?.toString().orEmpty()
                 )
                 AppLog.append(this, AppLog.Tag.CHECK, "开始批量检测：${mode.label}，共 $count 个书源")
                 CheckService.start(this, currentImportFile!!.absolutePath, settings)

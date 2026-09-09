@@ -125,7 +125,8 @@ object SourceImporter {
 
     private val adultKeys = listOf(
         "成人", "色情", "小黄文", "黄文", "肉文", "h漫", "里番", "18x",
-        "18禁", "r18", "r-18", "porn", "adult", "成人小说", "成人漫画", "黄书"
+        "18禁", "r18", "r-18", "porn", "adult", "成人小说", "成人漫画", "黄书",
+        "🔞", "po18", "腐小说", "腐文", "污书", "欲望"
     )
 
     private val comicKeys = listOf(

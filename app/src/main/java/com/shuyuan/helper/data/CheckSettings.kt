@@ -11,5 +11,6 @@ data class CheckSettings(
     val concurrency: Int = 12,
     val keyword: String = "我",
     val maxBodyBytes: Int = 512 * 1024,
-    val adultInspect: Boolean = true
+    val adultInspect: Boolean = true,
+    val customAdultKeywords: String = ""
 )

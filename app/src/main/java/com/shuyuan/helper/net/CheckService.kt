@@ -165,7 +165,8 @@ class CheckService : Service() {
             timeoutSec = getLongExtra(EXTRA_TIMEOUT_SEC, 12L),
             concurrency = getIntExtra(EXTRA_CONCURRENCY, 12),
             keyword = getStringExtra(EXTRA_KEYWORD) ?: "我",
-            adultInspect = getBooleanExtra(EXTRA_ADULT_INSPECT, true)
+            adultInspect = getBooleanExtra(EXTRA_ADULT_INSPECT, true),
+            customAdultKeywords = getStringExtra(EXTRA_CUSTOM_ADULT_KEYWORDS).orEmpty()
         )
     }
 
@@ -180,6 +181,7 @@ class CheckService : Service() {
         const val EXTRA_CONCURRENCY = "concurrency"
         const val EXTRA_KEYWORD = "keyword"
         const val EXTRA_ADULT_INSPECT = "adult_inspect"
+        const val EXTRA_CUSTOM_ADULT_KEYWORDS = "custom_adult_keywords"
         private const val ID = 1001
         private const val CHANNEL_ID = "source_check"
 
@@ -192,6 +194,7 @@ class CheckService : Service() {
                 putExtra(EXTRA_CONCURRENCY, settings.concurrency)
                 putExtra(EXTRA_KEYWORD, settings.keyword)
                 putExtra(EXTRA_ADULT_INSPECT, settings.adultInspect)
+                putExtra(EXTRA_CUSTOM_ADULT_KEYWORDS, settings.customAdultKeywords)
             }
             context.startForegroundService(intent)
         }

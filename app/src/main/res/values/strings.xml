@@ -36,7 +36,9 @@
     <string name="log_cleared">日志已清空</string>
     <string name="check_quick">快速检测</string>
     <string name="check_standard">标准检测</string>
-    <string name="start_adult_inspect">检测时同时做成人内容识别（访问页面/搜索结果正文判断，更准）</string>
+    <string name="start_adult_inspect">成人识别：检测时会主动访问页面/搜索结果正文判断，不只看标题</string>
+    <string name="start_custom_adult_keywords">自定义关键词（可选，多个用逗号或换行分隔）</string>
+    <string name="start_custom_adult_hint">例如：腐、PO18、污书、欲望（命中任意一个即归入成人）</string>
     <string name="filter_all">全部</string>
     <string name="filter_ok">可用</string>
     <string name="filter_uncertain">疑似</string>

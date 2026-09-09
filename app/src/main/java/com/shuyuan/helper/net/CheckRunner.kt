@@ -38,10 +38,13 @@ object CheckRunner {
                         var group = source.group
                         var detail = result.message
                         if (settings.adultInspect && group != SourceGroup.ADULT) {
-                            val hits = AdultContentSniffer.hits(result.contentSample)
+                            val hits = AdultContentSniffer.hits(
+                                result.contentSample,
+                                settings.customAdultKeywords
+                            )
                             if (hits.isNotEmpty()) {
                                 group = SourceGroup.ADULT
-                                detail = "${result.message}\n[内容识别] 命中成人特征：${hits.joinToString("、")}"
+                                detail = "${result.message}\n[主动访问识别] 命中特征：${hits.joinToString("、")}"
                             }
                         }
                         CheckManager.updateItem(
