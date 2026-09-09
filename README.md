@@ -15,7 +15,7 @@
 - 导入 → 检测 → 导出可用书源全流程可用；
 - 支持标准检测（按书源搜索规则发真实搜索请求）与快速检测（仅站点连通性）。
 
-下载：见 [Releases](../../releases/latest) 中的 APK。
+下载：见 [Releases](./releases/latest) 中的 APK。
 
 ---
 
