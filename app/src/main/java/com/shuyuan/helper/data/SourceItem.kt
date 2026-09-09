@@ -6,6 +6,7 @@ enum class SourceGroup(val label: String) {
     NOVEL("小说"),
     COMIC("漫画"),
     ADULT("成人"),
+    SUSPECT_ADULT("疑似成人"),
     AUDIO("音频"),
     OTHER("其他");
 

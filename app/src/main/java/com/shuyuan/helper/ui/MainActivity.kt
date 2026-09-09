@@ -138,7 +138,11 @@ class MainActivity : AppCompatActivity() {
         currentImportFile = CheckManager.importFile?.let { File(it) }
 
         binding.rvSources.layoutManager = LinearLayoutManager(this)
-        adapter = SourceListAdapter { showSourceDetail(it) }
+        adapter = SourceListAdapter(
+            onClick = { showSourceDetail(it) },
+            onLongClick = { startMultiSelect(it) },
+            onSelectionChanged = { updateSelectionBar() }
+        )
         binding.rvSources.adapter = adapter
 
         binding.btnImport.setOnClickListener { showImportOptions() }
@@ -157,6 +161,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.btnExport.setOnClickListener { showExportDialog() }
+        binding.btnSelectAll.setOnClickListener { adapter.selectAllVisible() }
+        binding.btnCancelSelect.setOnClickListener { exitMultiSelect() }
+        binding.btnDeleteSelected.setOnClickListener { confirmDeleteSelected() }
         setupFilter()
         setupGroupFilter()
         observeState()
@@ -182,11 +189,80 @@ class MainActivity : AppCompatActivity() {
                 R.id.btnGroupNovel -> SourceGroup.NOVEL
                 R.id.btnGroupComic -> SourceGroup.COMIC
                 R.id.btnGroupAdult -> SourceGroup.ADULT
+                R.id.btnGroupSuspectAdult -> SourceGroup.SUSPECT_ADULT
                 R.id.btnGroupAudio -> SourceGroup.AUDIO
                 R.id.btnGroupOther -> SourceGroup.OTHER
                 else -> null
             }
             updateSummary(CheckManager.items.value)
+        }
+    }
+
+    private fun startMultiSelect(item: SourceItem) {
+        if (CheckManager.running.value) return
+        adapter.enterSelectionMode()
+        adapter.toggleSelected(item)
+    }
+
+    private fun exitMultiSelect() {
+        adapter.exitSelectionMode()
+        updateSummary(CheckManager.items.value)
+    }
+
+    private fun updateSelectionBar() {
+        val selecting = adapter.selectionMode
+        binding.layoutSelectBar.isVisible = selecting
+        if (selecting) {
+            val visibleCount = adapter.selectedVisibleCount()
+            binding.tvSelectInfo.text = "已选 ${adapter.selectedCount} / 当前筛选 $visibleCount"
+            binding.btnDeleteSelected.isEnabled = adapter.selectedCount > 0
+            binding.btnImport.isEnabled = false
+            binding.btnOpenGenerator.isEnabled = false
+            binding.btnOpenLog.isEnabled = false
+            binding.btnExport.isEnabled = false
+            binding.btnStart.isEnabled = false
+            binding.chipFilter.isEnabled = false
+            binding.groupFilterGroup.isEnabled = false
+        } else {
+            binding.btnDeleteSelected.isEnabled = false
+            binding.chipFilter.isEnabled = true
+            binding.groupFilterGroup.isEnabled = true
+            updateSummary(CheckManager.items.value)
+        }
+    }
+
+    private fun confirmDeleteSelected() {
+        val count = adapter.selectedCount
+        if (count <= 0) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle("删除书源")
+            .setMessage("确定从列表中删除选中的 $count 个书源吗？\n\n只影响本 App 的当前列表，不会改动手机里已保存的导出文件。")
+            .setPositiveButton("删除") { _, _ -> deleteSelectedItems() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun deleteSelectedItems() {
+        val current = CheckManager.items.value
+        val remaining = current.filterNot { adapter.isSelected(it) }
+        if (remaining.size == current.size) return
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                val f = File(filesDir, "import_sources.json")
+                f.writeText(SourceImporter.toRawText(remaining))
+                f
+            }
+            currentImportFile = if (remaining.isEmpty()) null else file
+            CheckManager.importFile = if (remaining.isEmpty()) null else file.absolutePath
+            CheckManager.replaceAll(remaining, "已删除 ${current.size - remaining.size} 个书源")
+            adapter.exitSelectionMode()
+            AppLog.append(
+                this@MainActivity,
+                AppLog.Tag.IMPORT,
+                "删除书源：${current.size - remaining.size} 个，剩余 ${remaining.size} 个"
+            )
+            updateSummary(remaining)
+            toast("已删除 ${current.size - remaining.size} 个书源")
         }
     }
 

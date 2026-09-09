@@ -4,6 +4,7 @@ import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import com.shuyuan.helper.R
 import com.shuyuan.helper.data.SourceGroup
@@ -19,10 +20,15 @@ enum class SourceFilter(val match: (SourceState) -> Boolean) {
 }
 
 class SourceListAdapter(
-    private val onClick: (SourceItem) -> Unit
+    private val onClick: (SourceItem) -> Unit,
+    private val onLongClick: ((SourceItem) -> Unit)? = null,
+    private val onSelectionChanged: (() -> Unit)? = null
 ) : RecyclerView.Adapter<SourceListAdapter.VH>() {
 
     private val all = mutableListOf<SourceItem>()
+    private val selectedKeys = LinkedHashSet<String>()
+    var selectionMode: Boolean = false
+        private set
     var filter: SourceFilter = SourceFilter.ALL
         set(value) {
             field = value
@@ -36,8 +42,46 @@ class SourceListAdapter(
             notifyDataSetChanged()
         }
 
+    val selectedCount: Int
+        get() = selectedKeys.size
+
+    private fun keyOf(item: SourceItem): String = "${item.host}\u0000${item.name}"
+
     private fun visibleItems(): List<SourceItem> =
         all.filter { filter.match(it.state) && (groupFilter == null || it.group == groupFilter) }
+
+    fun isSelected(item: SourceItem): Boolean = selectedKeys.contains(keyOf(item))
+
+    fun enterSelectionMode() {
+        if (selectionMode) return
+        selectionMode = true
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke()
+    }
+
+    fun exitSelectionMode() {
+        if (!selectionMode && selectedKeys.isEmpty()) return
+        selectionMode = false
+        selectedKeys.clear()
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke()
+    }
+
+    fun toggleSelected(item: SourceItem) {
+        if (!selectionMode) enterSelectionMode()
+        val key = keyOf(item)
+        if (!selectedKeys.remove(key)) selectedKeys.add(key)
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke()
+    }
+
+    fun selectAllVisible() {
+        visibleItems().forEach { selectedKeys.add(keyOf(it)) }
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke()
+    }
+
+    fun selectedVisibleCount(): Int = visibleItems().count { isSelected(it) }
 
     fun submit(list: List<SourceItem>) {
         all.clear()
@@ -61,6 +105,8 @@ class SourceListAdapter(
 
     inner class VH(private val binding: ItemSourceBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: SourceItem) {
+            binding.cbSelect.isVisible = selectionMode
+            binding.cbSelect.isChecked = isSelected(item)
             binding.tvName.text = item.name
             binding.tvUrl.text = item.url
             binding.tvStatus.text = item.detail
@@ -81,7 +127,16 @@ class SourceListAdapter(
             } else {
                 binding.tvBadge.visibility = android.view.View.GONE
             }
-            binding.root.setOnClickListener { onClick(item) }
+            if (selectionMode) {
+                binding.root.setOnClickListener { toggleSelected(item) }
+                binding.root.setOnLongClickListener(null)
+            } else {
+                binding.root.setOnClickListener { onClick(item) }
+                binding.root.setOnLongClickListener {
+                    onLongClick?.invoke(item)
+                    true
+                }
+            }
         }
     }
 }

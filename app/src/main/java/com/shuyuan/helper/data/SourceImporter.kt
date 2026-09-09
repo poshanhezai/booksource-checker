@@ -108,6 +108,7 @@ object SourceImporter {
 
         if (audioKeys.any { hay.contains(it) } || type == 1) return SourceGroup.AUDIO
         if (adultKeys.any { hay.contains(it) }) return SourceGroup.ADULT
+        if (suspectAdultKeys.any { hay.contains(it) }) return SourceGroup.SUSPECT_ADULT
         if (comicKeys.any { hay.contains(it) }) return SourceGroup.COMIC
         return when (type) {
             1 -> SourceGroup.AUDIO
@@ -126,9 +127,13 @@ object SourceImporter {
         "18禁", "r18", "r-18", "porn", "adult", "成人小说", "成人漫画", "黄书"
     )
 
+    private val suspectAdultKeys = listOf(
+        "敏感资源", "t.me", "telegram", "同人", "耽美", "腐向", "np", "本子", "绅士"
+    )
+
     private val comicKeys = listOf(
         "漫画", "动漫", "manga", "manhua", "comic", "comics", "看漫画",
-        "漫画屋", "dm5", "绅士", "本子"
+        "漫画屋", "dm5"
     )
 
     /** 将导入结果保存为原始 JSON 文本，供前台服务重新读取 */
