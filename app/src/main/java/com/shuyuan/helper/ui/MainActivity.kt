@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.shuyuan.helper.R
+import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.CheckMode
 import com.shuyuan.helper.data.CheckSettings
@@ -36,6 +37,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -43,6 +47,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: SourceListAdapter
     private var currentImportFile: File? = null
     private var startAfterPermission = false
+    private var pendingExportJson: String? = null
+    private var pendingExportLabel: String? = null
+
+    private val createExportFile = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val json = pendingExportJson ?: return@registerForActivityResult
+        lifecycleScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                    true
+                }.getOrDefault(false)
+            }
+            if (ok) {
+                AppLog.append(this@MainActivity, AppLog.Tag.EXPORT, "书源已保存到文件夹：${pendingExportLabel ?: ""}")
+                toast("已保存到所选位置")
+            } else {
+                toast("保存失败，请重试")
+            }
+            pendingExportJson = null
+            pendingExportLabel = null
+        }
+    }
 
     private val openFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -88,8 +117,12 @@ class MainActivity : AppCompatActivity() {
         binding.btnOpenGenerator.setOnClickListener {
             startActivity(Intent(this, GeneratorActivity::class.java))
         }
+        binding.btnOpenLog.setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
         binding.btnStart.setOnClickListener {
             if (CheckManager.running.value) {
+                AppLog.append(this, AppLog.Tag.CHECK, "用户停止批量检测")
                 CheckService.stop(this)
             } else {
                 ensureNotificationPermissionAndStart()
@@ -130,6 +163,7 @@ class MainActivity : AppCompatActivity() {
                     binding.btnStart.isEnabled = !running && currentImportFile != null
                     binding.btnImport.isEnabled = !running
                     binding.btnOpenGenerator.isEnabled = !running
+                    binding.btnOpenLog.isEnabled = !running
                     binding.progressBar.isVisible = running
                     binding.btnStart.text = getString(if (running) R.string.stop_check else R.string.start_check)
                     if (running) {
@@ -200,6 +234,11 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val parsed = withContext(Dispatchers.IO) { SourceImporter.parse(text) }
             if (parsed.items.isEmpty()) {
+                AppLog.append(
+                    this@MainActivity,
+                    AppLog.Tag.IMPORT,
+                    "导入失败：${parsed.message.ifBlank { "没有解析出有效书源" }}"
+                )
                 toast(parsed.message.ifBlank { "没有解析出有效书源" })
                 return@launch
             }
@@ -212,6 +251,7 @@ class MainActivity : AppCompatActivity() {
             CheckManager.importFile = file.absolutePath
             CheckManager.replaceAll(parsed.items, "导入成功：共 ${parsed.items.size} 个书源")
             val skip = if (parsed.skipped > 0) "，跳过 ${parsed.skipped} 条无法识别的" else ""
+            AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "导入 ${parsed.items.size} 个书源$skip")
             toast("已导入 ${parsed.items.size} 个书源$skip")
             updateSummary(parsed.items)
         }
@@ -293,6 +333,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("开始") { _, _ ->
                 val mode = if (group.checkedRadioButtonId == quick.id) CheckMode.QUICK else CheckMode.STANDARD
                 val settings = CheckSettings(mode = mode, timeoutSec = 12L, concurrency = 12)
+                AppLog.append(this, AppLog.Tag.CHECK, "开始批量检测：${mode.label}，共 $count 个书源")
                 CheckService.start(this, currentImportFile!!.absolutePath, settings)
             }
             .setNegativeButton("取消", null)
@@ -331,7 +372,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("导出书源 JSON")
             .setMessage("导出的文件与导入时格式一致，可被阅读 App 直接重新导入。")
             .setView(container)
-            .setPositiveButton("导出并分享") { _, _ ->
+            .setPositiveButton("分享") { _, _ ->
                 val json = when {
                     group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(items, false, true)
                     group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(items, true)
@@ -341,7 +382,25 @@ class MainActivity : AppCompatActivity() {
                     toast("按当前筛选没有可导出的书源")
                     return@setPositiveButton
                 }
-                SourceExporter.share(this, json, if (group.checkedRadioButtonId == rbDead.id) "失效书源" else "可用书源")
+                val label = if (group.checkedRadioButtonId == rbDead.id) "失效书源" else "可用书源"
+                SourceExporter.share(this, json, label)
+                AppLog.append(this, AppLog.Tag.EXPORT, "分享导出：$label")
+            }
+            .setNeutralButton("保存到文件夹") { _, _ ->
+                val json = when {
+                    group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(items, false, true)
+                    group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(items, true)
+                    else -> SourceExporter.buildJson(items, false)
+                }
+                if (json == "[]") {
+                    toast("按当前筛选没有可导出的书源")
+                    return@setNeutralButton
+                }
+                val label = if (group.checkedRadioButtonId == rbDead.id) "失效书源" else "可用书源"
+                pendingExportJson = json
+                pendingExportLabel = label
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                createExportFile.launch("${label}_$stamp.json")
             }
             .setNegativeButton("取消", null)
             .show()

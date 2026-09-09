@@ -37,6 +37,13 @@ data class GeneratedSource(
     val selfTestCount: Int = -1
 )
 
+data class SiteInspection(
+    val ok: Boolean,
+    val verdict: String,
+    val summary: String,
+    val items: List<String>
+)
+
 object SourceGenerator {
 
     private val client by lazy {
@@ -150,6 +157,136 @@ object SourceGenerator {
                 selfTestCount = selfTestCount
             )
         }
+
+    /**
+     * 适性预检：先判断网站是否具备「自动生成书源」的条件，
+     * 而不是直接盲目生成。结论分三档：
+     * 可直接自动生成 / 可做但需人工补规则 / 暂不适合自动生成。
+     */
+    suspend fun inspect(rawInput: String, keywordInput: String): SiteInspection =
+        withContext(Dispatchers.IO) {
+            val input = normalizeUrl(rawInput)
+            if (input == null) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "网址无效",
+                    summary = "请输入 http:// 或 https:// 开头的完整网址。",
+                    items = emptyList()
+                )
+            }
+            val origin = originOf(input)
+            if (origin == null) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "网址无效",
+                    summary = "无法识别网址主机。",
+                    items = emptyList()
+                )
+            }
+            val page = fetch(input)
+            if (page == null) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "暂不适合自动生成",
+                    summary = "连不上目标网站：超时、被网络阻断或站点已关闭。",
+                    items = listOf("建议先用浏览器打开确认网站是否仍能访问。")
+                )
+            }
+            val checks = ArrayList<String>()
+            checks.add("主页状态：HTTP ${page.status}")
+            val html = page.doc.html().lowercase()
+            val antiBot = containsAntiBot(html)
+
+            if (page.status == 403) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "暂不适合自动生成",
+                    summary = if (antiBot) {
+                        "网站启用了反爬/人机验证（Cloudflare 或同类防护），普通请求被 403 拒绝。"
+                    } else {
+                        "网站拒绝访问（HTTP 403）：可能封禁了非浏览器请求、需要登录或按地区限制。"
+                    },
+                    items = checks + "即使强行生成，检测时也会同样被拦截。"
+                )
+            }
+            if (page.status !in 200..399) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "暂不适合自动生成",
+                    summary = "主页返回 HTTP ${page.status}，网站当前不可正常访问。",
+                    items = checks
+                )
+            }
+            checks.add("页面标题：${guessSiteName(page.doc, origin)}")
+            if (antiBot && page.doc.body().text().length < 200) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "暂不适合自动生成",
+                    summary = "返回的是人机验证/JS 挑战页（Cloudflare 等），不是真实内容页。",
+                    items = checks + "自动请求无法通过验证，书源在阅读器中也会失效。"
+                )
+            }
+
+            val search = discoverSearch(input, page.doc)
+            if (search == null) {
+                return@withContext SiteInspection(
+                    ok = true,
+                    verdict = "可做但需人工补规则",
+                    summary = "网站本身可访问，但没有找到可自动识别的搜索入口。",
+                    items = checks + "可以手动提供搜索地址，或只用于书架/目录站。"
+                )
+            }
+            checks.add("搜索入口：已找到（${if (search.method == "POST") "POST" else "GET"}）")
+
+            val keyword = keywordInput.trim().ifBlank { "我" }
+            val resultPage = fetchSearch(search, keyword, origin)
+            if (resultPage == null || resultPage.status !in 200..399) {
+                return@withContext SiteInspection(
+                    ok = false,
+                    verdict = "可做但需人工补规则",
+                    summary = if (resultPage == null) {
+                        "主页可访问，但测试搜索请求失败。"
+                    } else {
+                        "主页可访问，但测试搜索返回 HTTP ${resultPage.status}，搜索接口被拦截。"
+                    },
+                    items = checks
+                )
+            }
+            if (looksLikeNoResult(resultPage.doc)) {
+                return@withContext SiteInspection(
+                    ok = true,
+                    verdict = "可做但需人工补规则",
+                    summary = "搜索入口能用，但当前关键词没有返回结果，无法自动推断列表规则。",
+                    items = checks + "可换个常见书名重试。"
+                )
+            }
+
+            val rule = inferRules(resultPage.doc, origin)
+            if (rule != null && rule.bookList.isNotBlank()) {
+                checks.add("列表结构：自动识别成功，自测命中 ${rule.selfTestCount} 条")
+                return@withContext SiteInspection(
+                    ok = true,
+                    verdict = "可直接自动生成",
+                    summary = "网站结构适合做书源，可以尝试直接生成初稿。",
+                    items = checks + "注意：目录与正文规则仍需后续验证。"
+                )
+            }
+            return@withContext SiteInspection(
+                ok = true,
+                verdict = "可做但需人工补规则",
+                summary = "网站能访问、搜索也能返回内容，但页面结构较特殊，自动推断没有命中。",
+                items = checks + "生成初稿后可能需要人工修改 ruleSearch。"
+            )
+        }
+
+    private fun containsAntiBot(html: String): Boolean {
+        val markers = listOf(
+            "cf-chl", "challenge-platform", "cf-browser-verification", "cf-turnstile",
+            "just a moment", "enable javascript and cookies", "verify you are human",
+            "attention required", "安全检查", "人机验证", "请开启javascript", "captcha"
+        )
+        return markers.any { html.contains(it) }
+    }
 
     private fun normalizeUrl(input: String): String? {
         var s = input.trim()

@@ -10,10 +10,12 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.shuyuan.helper.R
+import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.CheckMode
 import com.shuyuan.helper.data.CheckSettings
 import com.shuyuan.helper.data.SourceImporter
+import com.shuyuan.helper.data.SourceState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -66,6 +68,7 @@ class CheckService : Service() {
             SourceImporter.parse(text)
         }
         if (parsed.items.isEmpty()) {
+            AppLog.append(this, AppLog.Tag.CHECK, "检测启动失败：导入内容无法解析或没有可检测书源")
             CheckManager.updateProgress(0, 0, "", "导入内容无法解析或没有可检测书源")
             finish()
             return
@@ -77,10 +80,21 @@ class CheckService : Service() {
 
         try {
             CheckRunner.run(items, settings)
+            val now = CheckManager.items.value
+            val ok = now.count { it.state == SourceState.OK }
+            val uncertain = now.count { it.state == SourceState.UNCERTAIN }
+            val dead = now.count { it.state == SourceState.DEAD }
+            AppLog.append(
+                this,
+                AppLog.Tag.CHECK,
+                "检测完成：共 $total 个，可用 $ok 疑似 $uncertain 失效 $dead"
+            )
             CheckManager.updateProgress(total, total, "", "检测完成：$total 个书源已处理")
         } catch (e: kotlinx.coroutines.CancellationException) {
+            AppLog.append(this, AppLog.Tag.CHECK, "检测已停止")
             CheckManager.updateProgress(0, 0, "", "检测已停止")
         } catch (e: Exception) {
+            AppLog.append(this, AppLog.Tag.CHECK, "检测出错：${e.message}")
             CheckManager.updateProgress(0, 0, "", "检测出错：${e.message}")
         } finally {
             finish()

@@ -108,15 +108,33 @@
                 android:textColorHint="@color/text_secondary"
                 android:textSize="15sp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnGenStart"
-                style="@style/Widget.Material3.Button"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="46dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="@string/generator_action" />
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGenPrecheck"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="@string/generator_precheck" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGenStart"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="@string/generator_action" />
+            </LinearLayout>
 
             <ProgressBar
                 android:id="@+id/progressGen"

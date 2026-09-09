@@ -3,6 +3,7 @@
     <string name="app_name">书源助手</string>
     <string name="action_import">导入</string>
     <string name="open_generator">生成书源</string>
+    <string name="open_log">日志</string>
     <string name="paste_import">粘贴 JSON</string>
     <string name="file_import">选择文件</string>
     <string name="start_check">开始检测</string>
@@ -11,6 +12,9 @@
     <string name="generator_back">返回检测</string>
     <string name="generator_title">生成书源</string>
     <string name="generator_subtitle">输入网站首页 / 搜索页，自动推断搜索地址与列表规则，生成 Legado 书源初稿。</string>
+    <string name="generator_precheck">适性预检</string>
+    <string name="generator_prechecking">正在检查这个网站能不能做成书源…</string>
+    <string name="generator_precheck_hint">预检会先给出“适合 / 需人工 / 暂不适合”的报告，再决定要不要生成。</string>
     <string name="generator_url_label">网站地址</string>
     <string name="generator_url_hint">例如 https://example.com 或其搜索页</string>
     <string name="generator_keyword_label">测试关键词（可留空，默认“我”）</string>
@@ -20,6 +24,12 @@
     <string name="generator_add">加入检测列表</string>
     <string name="generator_copy">复制 JSON</string>
     <string name="generator_tip">说明：自动推断只覆盖搜索和列表规则（ruleSearch），目录/正文规则暂未自动生成；登录、验证码、JS 动态加载的站点可能失败。</string>
+    <string name="log_title">运行日志</string>
+    <string name="log_subtitle">记录导入、检测、生成与导出过程；保存在 App 内部，可导出保存到手机任意位置。</string>
+    <string name="log_empty">还没有日志。导入、检测、生成书源或导出后会自动记录。</string>
+    <string name="log_save">保存日志</string>
+    <string name="log_clear">清空日志</string>
+    <string name="log_cleared">日志已清空</string>
     <string name="check_quick">快速检测</string>
     <string name="check_standard">标准检测</string>
     <string name="filter_all">全部</string>

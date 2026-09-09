@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.shuyuan.helper.R
+import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.SourceImporter
 import com.shuyuan.helper.databinding.ActivityGeneratorBinding
@@ -34,8 +35,16 @@ class GeneratorActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.btnGenBack.setOnClickListener { finish() }
+        binding.btnGenPrecheck.setOnClickListener {
+            val url = inputUrl()
+            if (url.isBlank()) {
+                toast("请先输入网站地址")
+                return@setOnClickListener
+            }
+            precheck(url, inputKeyword())
+        }
         binding.btnGenStart.setOnClickListener {
-            val url = binding.etGenUrl.text?.toString().orEmpty().trim()
+            val url = inputUrl()
             if (url.isBlank()) {
                 toast("请先输入网站地址")
                 return@setOnClickListener
@@ -46,31 +55,69 @@ class GeneratorActivity : AppCompatActivity() {
         binding.btnGenCopy.setOnClickListener { copyJson() }
     }
 
-    private fun generate(url: String, keyword: String) {
-        binding.btnGenStart.isEnabled = false
-        binding.layoutGenActions.isVisible = false
-        binding.tvGenResult.isVisible = false
-        binding.tvGenStatus.isVisible = true
-        binding.tvGenStatus.text = getString(R.string.generator_working)
-        binding.progressGen.isVisible = true
+    private fun inputUrl(): String = binding.etGenUrl.text?.toString().orEmpty().trim()
 
+    private fun inputKeyword(): String = binding.etGenKeyword.text?.toString().orEmpty().trim()
+
+    private fun setWorking(working: Boolean, statusText: String? = null) {
+        binding.btnGenStart.isEnabled = !working
+        binding.btnGenPrecheck.isEnabled = !working
+        binding.layoutGenActions.isVisible = false
+        binding.progressGen.isVisible = working
+        binding.tvGenStatus.isVisible = working && !statusText.isNullOrBlank()
+        if (!statusText.isNullOrBlank()) binding.tvGenStatus.text = statusText
+    }
+
+    private fun generate(url: String, keyword: String) {
+        setWorking(true, getString(R.string.generator_working))
+        binding.tvGenResult.isVisible = false
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 SourceGenerator.generate(url, keyword)
             }
-            binding.btnGenStart.isEnabled = true
-            binding.progressGen.isVisible = false
-            binding.tvGenStatus.isVisible = false
+            setWorking(false)
             binding.tvGenResult.isVisible = true
             if (result.ok) {
                 lastJson = result.json
                 binding.tvGenResult.text = result.summary
                 binding.layoutGenActions.isVisible = true
+                AppLog.append(
+                    this@GeneratorActivity,
+                    AppLog.Tag.GENERATE,
+                    "生成书源：$url -> 成功（搜索规则${if (result.searchUrl.isBlank()) "为空" else "已生成"}，列表自测 ${result.selfTestCount} 条）"
+                )
             } else {
                 lastJson = null
                 binding.tvGenResult.text = "生成失败：\n${result.message}"
                 binding.layoutGenActions.isVisible = false
+                AppLog.append(this@GeneratorActivity, AppLog.Tag.GENERATE, "生成书源：$url -> 失败：${result.message}")
             }
+        }
+    }
+
+    private fun precheck(url: String, keyword: String) {
+        setWorking(true, getString(R.string.generator_prechecking))
+        binding.tvGenResult.isVisible = false
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                SourceGenerator.inspect(url, keyword)
+            }
+            setWorking(false)
+            binding.tvGenResult.isVisible = true
+            lastJson = null
+            val text = buildString {
+                append("适性预检：").append(result.verdict).append('\n')
+                append(result.summary).append('\n')
+                for (line in result.items) {
+                    append("· ").append(line).append('\n')
+                }
+            }
+            binding.tvGenResult.text = text
+            AppLog.append(
+                this@GeneratorActivity,
+                AppLog.Tag.GENERATE,
+                "适性预检：$url -> ${result.verdict}（${result.summary.take(60)}）"
+            )
         }
     }
 
