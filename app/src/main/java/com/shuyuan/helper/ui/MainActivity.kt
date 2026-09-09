@@ -153,12 +153,23 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LogActivity::class.java))
         }
         binding.btnStart.setOnClickListener {
-            if (CheckManager.running.value) {
-                AppLog.append(this, AppLog.Tag.CHECK, "用户停止批量检测")
-                CheckService.stop(this)
-            } else {
-                ensureNotificationPermissionAndStart()
+            when {
+                CheckManager.running.value && CheckManager.paused.value -> {
+                    AppLog.append(this, AppLog.Tag.CHECK, "继续批量检测")
+                    CheckService.resume(this)
+                }
+
+                CheckManager.running.value -> {
+                    AppLog.append(this, AppLog.Tag.CHECK, "暂停批量检测")
+                    CheckService.pause(this)
+                }
+
+                else -> ensureNotificationPermissionAndStart()
             }
+        }
+        binding.btnStop.setOnClickListener {
+            AppLog.append(this, AppLog.Tag.CHECK, "用户停止批量检测")
+            CheckService.stop(this)
         }
         binding.btnExport.setOnClickListener { showExportDialog() }
         binding.btnSelectAll.setOnClickListener { adapter.selectAllVisible() }
@@ -275,17 +286,35 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             combine(
                 CheckManager.running,
+                CheckManager.paused,
                 CheckManager.progressText,
                 CheckManager.finishedText
-            ) { running, progressText, finishedText -> Triple(running, progressText, finishedText) }
-                .collect { (running, progressText, finishedText) ->
-                    binding.btnStart.isEnabled = !running && currentImportFile != null
+            ) { running, paused, progressText, finishedText ->
+                Triple(running, paused, progressText to finishedText)
+            }
+                .collect { state ->
+                    val running = state.first
+                    val paused = state.second
+                    val progressText = state.third.first
+                    val finishedText = state.third.second
+                    binding.btnStart.isEnabled = running || currentImportFile != null
                     binding.btnImport.isEnabled = !running
                     binding.btnOpenGenerator.isEnabled = !running
                     binding.btnOpenLog.isEnabled = !running
+                    binding.btnStop.isVisible = running
+                    binding.btnExport.isVisible = !running
                     binding.progressBar.isVisible = running
-                    binding.btnStart.text = getString(if (running) R.string.stop_check else R.string.start_check)
-                    if (running) {
+                    binding.btnStart.text = getString(
+                        when {
+                            !running -> R.string.start_check
+                            paused -> R.string.resume_check
+                            else -> R.string.pause_check
+                        }
+                    )
+                    if (running && paused) {
+                        binding.tvSummary.text = "检测已暂停：点击“继续检测”恢复，或点“停止检测”结束"
+                        binding.tvStats.visibility = android.view.View.VISIBLE
+                    } else if (running) {
                         binding.tvSummary.text = progressText.ifBlank { "正在检测…" }
                     } else if (finishedText.isNotBlank()) {
                         binding.tvSummary.text = finishedText

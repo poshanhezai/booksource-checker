@@ -58,6 +58,16 @@ class CheckService : Service() {
                 job?.cancel()
                 finish(stoppedByUser = true)
             }
+
+            ACTION_PAUSE -> {
+                CheckManager.setPaused(true)
+                notificationManager.notify(ID, notification("检测已暂停"))
+            }
+
+            ACTION_RESUME -> {
+                CheckManager.setPaused(false)
+                notificationManager.notify(ID, notification("检测继续中"))
+            }
         }
         return START_NOT_STICKY
     }
@@ -162,6 +172,8 @@ class CheckService : Service() {
     companion object {
         const val ACTION_START = "com.shuyuan.helper.action.START_CHECK"
         const val ACTION_STOP = "com.shuyuan.helper.action.STOP_CHECK"
+        const val ACTION_PAUSE = "com.shuyuan.helper.action.PAUSE_CHECK"
+        const val ACTION_RESUME = "com.shuyuan.helper.action.RESUME_CHECK"
         const val EXTRA_PATH = "import_file"
         const val EXTRA_STANDARD = "standard_mode"
         const val EXTRA_TIMEOUT_SEC = "timeout_sec"
@@ -187,6 +199,18 @@ class CheckService : Service() {
         fun stop(context: Context) {
             context.startService(
                 Intent(context, CheckService::class.java).setAction(ACTION_STOP)
+            )
+        }
+
+        fun pause(context: Context) {
+            context.startService(
+                Intent(context, CheckService::class.java).setAction(ACTION_PAUSE)
+            )
+        }
+
+        fun resume(context: Context) {
+            context.startService(
+                Intent(context, CheckService::class.java).setAction(ACTION_RESUME)
             )
         }
     }

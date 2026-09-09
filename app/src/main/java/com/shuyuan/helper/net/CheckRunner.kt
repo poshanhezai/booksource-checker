@@ -9,6 +9,7 @@ import com.shuyuan.helper.data.SourceState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -28,6 +29,10 @@ object CheckRunner {
         coroutineScope {
             val jobs = items.mapIndexed { index, source ->
                 async {
+                    // 暂停时新任务在这里等待；正在执行的单条检测会先跑完，随后也停住
+                    while (CheckManager.paused.value) {
+                        delay(250)
+                    }
                     semaphore.withPermit {
                         val result = checkOne(engine, hostProbes, source, settings)
                         var group = source.group

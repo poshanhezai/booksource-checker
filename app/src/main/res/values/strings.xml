@@ -9,6 +9,8 @@
     <string name="multi_file_import">多选文件合并导入</string>
     <string name="clear_list">清空列表</string>
     <string name="start_check">开始检测</string>
+    <string name="pause_check">暂停检测</string>
+    <string name="resume_check">继续检测</string>
     <string name="stop_check">停止检测</string>
     <string name="export">导出</string>
     <string name="generator_back">返回检测</string>

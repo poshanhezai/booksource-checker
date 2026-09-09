@@ -14,6 +14,9 @@ object CheckManager {
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
+    private val _paused = MutableStateFlow(false)
+    val paused: StateFlow<Boolean> = _paused.asStateFlow()
+
     private val _progress = MutableStateFlow(0)
     val progress: StateFlow<Int> = _progress.asStateFlow()
 
@@ -51,12 +54,18 @@ object CheckManager {
         _running.value = running
         if (!running) {
             _progressText.value = ""
+            _paused.value = false
         }
+    }
+
+    fun setPaused(paused: Boolean) {
+        _paused.value = paused
     }
 
     fun clear() {
         _items.value = emptyList()
         _running.value = false
+        _paused.value = false
         _progress.value = 0
         _progressText.value = ""
         _finishedText.value = ""
