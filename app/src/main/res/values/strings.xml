@@ -7,6 +7,7 @@
     <string name="paste_import">粘贴 JSON</string>
     <string name="file_import">选择文件</string>
     <string name="multi_file_import">多选文件合并导入</string>
+    <string name="deduplicate_sources">书源去重</string>
     <string name="clear_list">清空列表</string>
     <string name="start_check">开始</string>
     <string name="pause_check">暂停</string>

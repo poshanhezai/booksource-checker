@@ -377,6 +377,7 @@ class MainActivity : AppCompatActivity() {
                     getString(R.string.paste_import),
                     getString(R.string.file_import),
                     getString(R.string.multi_file_import),
+                    getString(R.string.deduplicate_sources),
                     getString(R.string.clear_list)
                 )
             ) { _, which ->
@@ -384,7 +385,8 @@ class MainActivity : AppCompatActivity() {
                     0 -> showPasteDialog()
                     1 -> openFile.launch(arrayOf("*/*"))
                     2 -> openMultipleFiles.launch(arrayOf("*/*"))
-                    3 -> showClearListDialog()
+                    3 -> showDedupeDialog()
+                    4 -> showClearListDialog()
                 }
             }
             .setNegativeButton("取消", null)
@@ -453,6 +455,86 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showDedupeDialog() {
+        val current = CheckManager.items.value
+        if (current.isEmpty()) {
+            toast("当前没有可去重的书源")
+            return
+        }
+        val seen = HashSet<String>()
+        val duplicateNames = ArrayList<String>()
+        var duplicateCount = 0
+        val exactSeen = HashSet<String>()
+        for (item in current) {
+            val urlKey = normalizeSourceUrl(item.url) + "\u0000" + item.name.trim()
+            val exactKey = item.json.toString()
+            if (seen.contains(urlKey) || exactSeen.contains(exactKey)) {
+                duplicateCount++
+                if (duplicateNames.size < 8) duplicateNames.add(item.name)
+            } else {
+                seen.add(urlKey)
+                exactSeen.add(exactKey)
+            }
+        }
+        if (duplicateNames.isEmpty()) {
+            toast("没有发现重复书源")
+            return
+        }
+        val preview = duplicateNames.take(5).joinToString("\n· ", prefix = "例如：\n· ")
+        MaterialAlertDialogBuilder(this)
+            .setTitle("书源去重")
+            .setMessage(
+                "将按“相同地址 + 相同名称”或“完全相同 JSON”判断，保留第一份，删除 $duplicateCount 个重复书源。\n\n$preview"
+            )
+            .setPositiveButton("去重") { _, _ -> deduplicateSources() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun deduplicateSources() {
+        val current = CheckManager.items.value
+        if (current.isEmpty()) return
+        val seenUrl = HashSet<String>()
+        val seenJson = HashSet<String>()
+        val keep = ArrayList<SourceItem>(current.size)
+        var removed = 0
+        for (item in current) {
+            val urlKey = normalizeSourceUrl(item.url) + "\u0000" + item.name.trim()
+            val jsonKey = item.json.toString()
+            if (seenUrl.contains(urlKey) || seenJson.contains(jsonKey)) {
+                removed++
+            } else {
+                seenUrl.add(urlKey)
+                seenJson.add(jsonKey)
+                keep.add(item)
+            }
+        }
+        if (removed == 0) {
+            toast("没有发现重复书源")
+            return
+        }
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                val f = File(filesDir, "import_sources.json")
+                f.writeText(SourceImporter.toRawText(keep))
+                f
+            }
+            currentImportFile = file
+            CheckManager.importFile = file.absolutePath
+            CheckManager.replaceAll(keep, "书源去重完成：删除 $removed 个重复，剩余 ${keep.size} 个")
+            AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "书源去重：删除 $removed 个重复，剩余 ${keep.size} 个")
+            updateSummary(keep)
+            toast("已删除 $removed 个重复书源")
+        }
+    }
+
+    private fun normalizeSourceUrl(url: String): String {
+        return url.trim().lowercase()
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .removeSuffix("/")
     }
 
     private fun showPasteDialog() {
