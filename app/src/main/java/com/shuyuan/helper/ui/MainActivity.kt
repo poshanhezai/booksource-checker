@@ -316,7 +316,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     )
                     if (running && paused) {
-                        binding.tvSummary.text = "检测已暂停：点击“继续检测”恢复，或点“停止检测”结束"
+                        binding.tvSummary.text = "检测已暂停：点击“继续”恢复，或点“停止”结束"
                         binding.tvStats.visibility = android.view.View.VISIBLE
                     } else if (running) {
                         binding.tvSummary.text = progressText.ifBlank { "正在检测…" }

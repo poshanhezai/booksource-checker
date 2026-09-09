@@ -316,6 +316,11 @@
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:minWidth="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
             android:text="@string/action_import" />
 
         <com.google.android.material.button.MaterialButton
@@ -327,6 +332,11 @@
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:minWidth="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
             android:text="@string/start_check" />
 
         <com.google.android.material.button.MaterialButton
@@ -338,8 +348,12 @@
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:text="@string/stop_check"
-            android:visibility="visible" />
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:minWidth="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:text="@string/stop_check" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnExport"
@@ -349,6 +363,11 @@
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:minWidth="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
             android:text="@string/export" />
     </LinearLayout>
 </LinearLayout>
