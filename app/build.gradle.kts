@@ -11,8 +11,8 @@ android {
         applicationId = "com.shuyuan.helper"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.2"
+        versionCode = 2
+        versionName = "0.1.3"
     }
 
     buildTypes {

@@ -30,6 +30,8 @@ import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceState
 import com.shuyuan.helper.databinding.ActivityMainBinding
 import com.shuyuan.helper.net.CheckService
+import com.shuyuan.helper.net.GeneratedSource
+import com.shuyuan.helper.net.SourceGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -168,14 +170,112 @@ class MainActivity : AppCompatActivity() {
         }
         MaterialAlertDialogBuilder(this)
             .setTitle("导入书源")
-            .setItems(arrayOf(getString(R.string.paste_import), getString(R.string.file_import))) { _, which ->
+            .setItems(
+                arrayOf(
+                    getString(R.string.paste_import),
+                    getString(R.string.file_import),
+                    getString(R.string.url_generate)
+                )
+            ) { _, which ->
                 when (which) {
                     0 -> showPasteDialog()
                     1 -> openFile.launch(arrayOf("*/*"))
+                    2 -> showGenerateDialog()
                 }
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showGenerateDialog() {
+        val urlInput = EditText(this).apply {
+            hint = "网站首页 / 搜索页 / 详情页网址"
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI
+            textSize = 14f
+        }
+        val keywordInput = EditText(this).apply {
+            hint = "测试关键词（可留空，默认“我”）"
+            textSize = 14f
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val pad = (resources.displayMetrics.density * 16).toInt()
+        urlInput.setPadding(0, pad, 0, pad)
+        keywordInput.setPadding(0, pad, 0, pad)
+        column.addView(urlInput)
+        column.addView(keywordInput)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.url_generate_title))
+            .setMessage("自动抓取页面、推断搜索地址和列表规则，生成一份 Legado 书源初稿。规则可能不完美，生成后建议先检测再导入阅读。")
+            .setView(column)
+            .setPositiveButton("生成初稿") { _, _ ->
+                val url = urlInput.text?.toString().orEmpty().trim()
+                if (url.isBlank()) {
+                    toast("请先输入网址")
+                    return@setPositiveButton
+                }
+                startGenerate(url, keywordInput.text?.toString().orEmpty())
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun startGenerate(url: String, keyword: String) {
+        val loading = MaterialAlertDialogBuilder(this)
+            .setTitle("正在生成书源初稿")
+            .setMessage("正在抓取页面、找搜索入口并分析列表结构…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                SourceGenerator.generate(url, keyword)
+            }
+            runCatching { loading.dismiss() }
+            if (!result.ok) {
+                toast(result.message)
+            } else {
+                showGeneratedResult(result)
+            }
+        }
+    }
+
+    private fun showGeneratedResult(result: GeneratedSource) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        MaterialAlertDialogBuilder(this)
+            .setTitle("生成完成（试验版）")
+            .setMessage(result.summary)
+            .setPositiveButton("加入列表") { _, _ ->
+                addGenerated(result.json.orEmpty())
+            }
+            .setNeutralButton("复制 JSON") { _, _ ->
+                clipboard.setPrimaryClip(ClipData.newPlainText("生成书源", result.json.orEmpty()))
+                toast("已复制 JSON，可粘贴到别处人工修改")
+            }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    private fun addGenerated(json: String) {
+        lifecycleScope.launch {
+            val parsed = withContext(Dispatchers.IO) { SourceImporter.parse(json) }
+            if (parsed.items.isEmpty()) {
+                toast("生成结果无法加入列表")
+                return@launch
+            }
+            val merged = CheckManager.items.value + parsed.items
+            val file = withContext(Dispatchers.IO) {
+                val f = File(filesDir, "import_sources.json")
+                f.writeText(SourceImporter.toRawText(merged))
+                f
+            }
+            currentImportFile = file
+            CheckManager.importFile = file.absolutePath
+            CheckManager.replaceAll(merged, "已加入自动生成的书源：${parsed.items.first().name}")
+            updateSummary(merged)
+            toast("已加入 ${parsed.items.size} 个自动生成书源，可开始检测")
+        }
     }
 
     private fun importText(text: String) {

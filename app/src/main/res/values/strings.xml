@@ -4,6 +4,8 @@
     <string name="action_import">导入</string>
     <string name="paste_import">粘贴 JSON</string>
     <string name="file_import">选择文件</string>
+    <string name="url_generate">网址自动生成</string>
+    <string name="url_generate_title">网址生成书源初稿（试验版）</string>
     <string name="start_check">开始检测</string>
     <string name="stop_check">停止检测</string>
     <string name="export">导出</string>
