@@ -34,6 +34,7 @@
     <string name="log_cleared">日志已清空</string>
     <string name="check_quick">快速检测</string>
     <string name="check_standard">标准检测</string>
+    <string name="start_adult_inspect">检测时同时做成人内容识别（访问页面/搜索结果正文判断，更准）</string>
     <string name="filter_all">全部</string>
     <string name="filter_ok">可用</string>
     <string name="filter_uncertain">疑似</string>
@@ -42,7 +43,6 @@
     <string name="group_novel">小说</string>
     <string name="group_comic">漫画</string>
     <string name="group_adult">成人</string>
-    <string name="group_suspect_adult">疑似成人</string>
     <string name="group_audio">音频</string>
     <string name="group_other">其他</string>
     <string name="select_all">全选</string>

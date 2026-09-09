@@ -10,5 +10,6 @@ data class CheckSettings(
     val timeoutSec: Long = 12L,
     val concurrency: Int = 12,
     val keyword: String = "我",
-    val maxBodyBytes: Int = 512 * 1024
+    val maxBodyBytes: Int = 512 * 1024,
+    val adultInspect: Boolean = true
 )

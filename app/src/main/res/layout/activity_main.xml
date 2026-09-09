@@ -200,16 +200,6 @@
             app:chipMinHeight="28dp" />
 
         <com.google.android.material.chip.Chip
-            android:id="@+id/btnGroupSuspectAdult"
-            style="@style/Widget.Material3.Chip.Filter"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/group_suspect_adult"
-            android:textSize="12sp"
-            app:checkedIconVisible="false"
-            app:chipMinHeight="28dp" />
-
-        <com.google.android.material.chip.Chip
             android:id="@+id/btnGroupAudio"
             style="@style/Widget.Material3.Chip.Filter"
             android:layout_width="wrap_content"

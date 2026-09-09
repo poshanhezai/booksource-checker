@@ -189,7 +189,6 @@ class MainActivity : AppCompatActivity() {
                 R.id.btnGroupNovel -> SourceGroup.NOVEL
                 R.id.btnGroupComic -> SourceGroup.COMIC
                 R.id.btnGroupAdult -> SourceGroup.ADULT
-                R.id.btnGroupSuspectAdult -> SourceGroup.SUSPECT_ADULT
                 R.id.btnGroupAudio -> SourceGroup.AUDIO
                 R.id.btnGroupOther -> SourceGroup.OTHER
                 else -> null
@@ -490,13 +489,23 @@ class MainActivity : AppCompatActivity() {
         group.addView(quick)
         standard.isChecked = true
         container.addView(group)
+        val adultCheck = android.widget.CheckBox(this).apply {
+            text = getString(R.string.start_adult_inspect)
+            isChecked = true
+        }
+        container.addView(adultCheck)
         MaterialAlertDialogBuilder(this)
             .setTitle("开始批量检测")
             .setMessage("共 $count 个书源。检测会在前台通知中持续进行，期间请保持网络畅通。")
             .setView(container)
             .setPositiveButton("开始") { _, _ ->
                 val mode = if (group.checkedRadioButtonId == quick.id) CheckMode.QUICK else CheckMode.STANDARD
-                val settings = CheckSettings(mode = mode, timeoutSec = 12L, concurrency = 12)
+                val settings = CheckSettings(
+                    mode = mode,
+                    timeoutSec = 12L,
+                    concurrency = 12,
+                    adultInspect = adultCheck.isChecked
+                )
                 AppLog.append(this, AppLog.Tag.CHECK, "开始批量检测：${mode.label}，共 $count 个书源")
                 CheckService.start(this, currentImportFile!!.absolutePath, settings)
             }

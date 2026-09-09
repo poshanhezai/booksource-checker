@@ -19,7 +19,8 @@ data class ProbeResult(
     val message: String,
     val httpCode: Int = 0,
     val elapsedMs: Long = -1L,
-    val bodySize: Int = 0
+    val bodySize: Int = 0,
+    val contentSample: String = ""
 )
 
 data class SearchAttempt(
@@ -125,7 +126,14 @@ class ProbeEngine(private val settings: CheckSettings) {
                     }
                     return@withContext SearchAttempt(
                         supported = true,
-                        result = ProbeResult(state, message, code, elapsed, size)
+                        result = ProbeResult(
+                            state = state,
+                            message = message,
+                            httpCode = code,
+                            elapsedMs = elapsed,
+                            bodySize = size,
+                            contentSample = text.take(MAX_SAMPLE)
+                        )
                     )
                 }
             } catch (e: Exception) {
@@ -147,12 +155,12 @@ class ProbeEngine(private val settings: CheckSettings) {
         elapsedMs: Long
     ): ProbeResult {
         val parked = parkedOrClosed(bodyText)
-        return when {
+        val base = when {
             code in 200..299 && parked != null ->
                 ProbeResult(SourceState.DEAD, parked, code, elapsedMs, bodySize)
 
             code in 200..399 ->
-                ProbeResult(SourceState.OK, "HTTP $code 站点正常可达", code, elapsedMs, bodySize)
+                ProbeResult(SourceState.OK, "HTTP $code 站点正常可达", code, elapsedMs, bodySize, bodyText.take(MAX_SAMPLE))
 
             code == 401 || code == 403 ->
                 ProbeResult(SourceState.UNCERTAIN, "HTTP $code 需要登录或被反爬拦截", code, elapsedMs, bodySize)
@@ -165,6 +173,11 @@ class ProbeEngine(private val settings: CheckSettings) {
 
             else ->
                 ProbeResult(SourceState.OK, "HTTP $code", code, elapsedMs, bodySize)
+        }
+        return if (base.contentSample.isBlank()) {
+            base.copy(contentSample = bodyText.take(MAX_SAMPLE))
+        } else {
+            base
         }
     }
 
@@ -264,6 +277,8 @@ class ProbeEngine(private val settings: CheckSettings) {
     companion object {
         const val UA =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+        private const val MAX_SAMPLE = 60_000
 
         fun charsetOf(name: String?): Charset {
             return runCatching { Charset.forName(name ?: "UTF-8") }.getOrDefault(Charsets.UTF_8)

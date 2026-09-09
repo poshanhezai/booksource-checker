@@ -4,6 +4,7 @@ import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.CheckMode
 import com.shuyuan.helper.data.CheckSettings
 import com.shuyuan.helper.data.SourceItem
+import com.shuyuan.helper.data.SourceGroup
 import com.shuyuan.helper.data.SourceState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -29,14 +30,24 @@ object CheckRunner {
                 async {
                     semaphore.withPermit {
                         val result = checkOne(engine, hostProbes, source, settings)
+                        var group = source.group
+                        var detail = result.message
+                        if (settings.adultInspect && group != SourceGroup.ADULT) {
+                            val hits = AdultContentSniffer.hits(result.contentSample)
+                            if (hits.isNotEmpty()) {
+                                group = SourceGroup.ADULT
+                                detail = "${result.message}\n[内容识别] 命中成人特征：${hits.joinToString("、")}"
+                            }
+                        }
                         CheckManager.updateItem(
                             index,
                             source.copy(
                                 state = result.state,
-                                detail = result.message,
+                                detail = detail,
                                 httpCode = result.httpCode,
                                 elapsedMs = result.elapsedMs,
-                                searchTried = settings.mode == CheckMode.STANDARD
+                                searchTried = settings.mode == CheckMode.STANDARD,
+                                group = group
                             )
                         )
                         synchronized(finishLock) {
