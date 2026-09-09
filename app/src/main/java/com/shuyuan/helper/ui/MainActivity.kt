@@ -27,6 +27,7 @@ import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.CheckMode
 import com.shuyuan.helper.data.CheckSettings
+import com.shuyuan.helper.data.SourceGroup
 import com.shuyuan.helper.data.SourceImporter
 import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceState
@@ -87,6 +88,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val openMultipleFiles =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isEmpty()) return@registerForActivityResult
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    val parsedItems = ArrayList<SourceItem>()
+                    var skipped = 0
+                    for (uri in uris) {
+                        val text = contentResolver.openInputStream(uri)
+                            ?.bufferedReader(Charsets.UTF_8)
+                            ?.use { it.readText() }
+                            .orEmpty()
+                        if (text.isBlank()) continue
+                        val r = SourceImporter.parse(text)
+                        parsedItems.addAll(r.items)
+                        skipped += r.skipped
+                    }
+                    parsedItems to skipped
+                }
+                if (result.first.isEmpty()) {
+                    toast("所选文件没有解析出有效书源")
+                    return@launch
+                }
+                appendImported(result.first, result.second, "多文件合并")
+            }
+        }
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted || Build.VERSION.SDK_INT < 33) {
@@ -130,6 +158,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnExport.setOnClickListener { showExportDialog() }
         setupFilter()
+        setupGroupFilter()
         observeState()
     }
 
@@ -143,6 +172,21 @@ class MainActivity : AppCompatActivity() {
                 R.id.btnFilterDead -> SourceFilter.DEAD
                 else -> SourceFilter.ALL
             }
+        }
+    }
+
+    private fun setupGroupFilter() {
+        binding.groupFilterGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            adapter.groupFilter = when (checkedIds.first()) {
+                R.id.btnGroupNovel -> SourceGroup.NOVEL
+                R.id.btnGroupComic -> SourceGroup.COMIC
+                R.id.btnGroupAdult -> SourceGroup.ADULT
+                R.id.btnGroupAudio -> SourceGroup.AUDIO
+                R.id.btnGroupOther -> SourceGroup.OTHER
+                else -> null
+            }
+            updateSummary(CheckManager.items.value)
         }
     }
 
@@ -196,15 +240,18 @@ class MainActivity : AppCompatActivity() {
             binding.btnExport.isEnabled = false
             return
         }
-        val ok = items.count { it.state == SourceState.OK }
-        val uncertain = items.count { it.state == SourceState.UNCERTAIN }
-        val dead = items.count { it.state == SourceState.DEAD }
-        val pending = items.count { !it.checked }
-        binding.tvSummary.text = "已导入 ${items.size} 个书源"
+        val activeGroup = adapter.groupFilter
+        val pool = items.filter { activeGroup == null || it.group == activeGroup }
+        val groupText = activeGroup?.label ?: "全部分组"
+        val ok = pool.count { it.state == SourceState.OK }
+        val uncertain = pool.count { it.state == SourceState.UNCERTAIN }
+        val dead = pool.count { it.state == SourceState.DEAD }
+        val pending = pool.count { !it.checked }
+        binding.tvSummary.text = "$groupText · ${pool.size} 个书源（共 ${items.size} 个）"
         binding.tvStats.visibility = android.view.View.VISIBLE
         binding.tvStats.text =
             "可用 $ok   疑似 $uncertain   失效 $dead   待检 $pending"
-        binding.btnExport.isEnabled = ok > 0 || uncertain > 0 || dead > 0
+        binding.btnExport.isEnabled = pool.any { it.checked }
         binding.btnStart.isEnabled = currentImportFile != null && !CheckManager.running.value
     }
 
@@ -218,12 +265,16 @@ class MainActivity : AppCompatActivity() {
             .setItems(
                 arrayOf(
                     getString(R.string.paste_import),
-                    getString(R.string.file_import)
+                    getString(R.string.file_import),
+                    getString(R.string.multi_file_import),
+                    getString(R.string.clear_list)
                 )
             ) { _, which ->
                 when (which) {
                     0 -> showPasteDialog()
                     1 -> openFile.launch(arrayOf("*/*"))
+                    2 -> openMultipleFiles.launch(arrayOf("*/*"))
+                    3 -> showClearListDialog()
                 }
             }
             .setNegativeButton("取消", null)
@@ -249,12 +300,49 @@ class MainActivity : AppCompatActivity() {
             }
             currentImportFile = file
             CheckManager.importFile = file.absolutePath
-            CheckManager.replaceAll(parsed.items, "导入成功：共 ${parsed.items.size} 个书源")
-            val skip = if (parsed.skipped > 0) "，跳过 ${parsed.skipped} 条无法识别的" else ""
-            AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "导入 ${parsed.items.size} 个书源$skip")
-            toast("已导入 ${parsed.items.size} 个书源$skip")
-            updateSummary(parsed.items)
+            appendImported(parsed.items, parsed.skipped, "导入")
         }
+    }
+
+    /** 把新书源追加进当前列表（不覆盖原有内容），实现多次 / 多文件合并。 */
+    private fun appendImported(newItems: List<SourceItem>, skipped: Int, action: String) {
+        if (newItems.isEmpty()) return
+        lifecycleScope.launch {
+            val merged = CheckManager.items.value + newItems
+            val file = withContext(Dispatchers.IO) {
+                val f = File(filesDir, "import_sources.json")
+                f.writeText(SourceImporter.toRawText(merged))
+                f
+            }
+            currentImportFile = file
+            CheckManager.importFile = file.absolutePath
+            CheckManager.replaceAll(merged, "${action}成功：新增 ${newItems.size} 个，当前共 ${merged.size} 个")
+            val skipText = if (skipped > 0) "，跳过 $skipped 条无法识别的" else ""
+            AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "$action：新增 ${newItems.size} 个书源$skipText，当前共 ${merged.size} 个")
+            toast("${action}成功：新增 ${newItems.size} 个书源$skipText")
+            updateSummary(merged)
+        }
+    }
+
+    private fun showClearListDialog() {
+        if (CheckManager.items.value.isEmpty()) {
+            toast("当前列表本来就是空的")
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("清空列表")
+            .setMessage("确定清空当前所有书源吗？已保存到手机里的导出文件不受影响。")
+            .setPositiveButton("清空") { _, _ ->
+                CheckManager.clear()
+                currentImportFile = null
+                val f = File(filesDir, "import_sources.json")
+                f.delete()
+                AppLog.append(this, AppLog.Tag.IMPORT, "清空当前书源列表")
+                updateSummary(emptyList())
+                toast("已清空")
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showPasteDialog() {
@@ -346,14 +434,20 @@ class MainActivity : AppCompatActivity() {
             toast("当前没有可导出的书源")
             return
         }
+        val activeGroup = adapter.groupFilter
+        val pool = items.filter { activeGroup == null || it.group == activeGroup }
+        if (pool.isEmpty()) {
+            toast("当前分组筛选下没有书源")
+            return
+        }
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 0, 48, 8)
         }
         val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        val okCount = items.count { it.state == SourceState.OK }
-        val uncertainCount = items.count { it.state == SourceState.UNCERTAIN }
-        val deadCount = items.count { it.state == SourceState.DEAD }
+        val okCount = pool.count { it.state == SourceState.OK }
+        val uncertainCount = pool.count { it.state == SourceState.UNCERTAIN }
+        val deadCount = pool.count { it.state == SourceState.DEAD }
         val rbOk = RadioButton(this).apply {
             text = "仅导出可用（$okCount 个）"
             isChecked = true
@@ -370,13 +464,22 @@ class MainActivity : AppCompatActivity() {
         container.addView(group)
         MaterialAlertDialogBuilder(this)
             .setTitle("导出书源 JSON")
-            .setMessage("导出的文件与导入时格式一致，可被阅读 App 直接重新导入。")
+            .setMessage(
+                buildString {
+                    if (activeGroup != null) {
+                        append("当前分组：").append(activeGroup.label).append("（共 ").append(pool.size).append(" 个）\n")
+                    } else {
+                        append("当前导出全部 ").append(pool.size).append(" 个书源。\n")
+                    }
+                    append("文件与导入时格式一致，可被阅读 App 直接重新导入。")
+                }
+            )
             .setView(container)
             .setPositiveButton("分享") { _, _ ->
                 val json = when {
-                    group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(items, false, true)
-                    group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(items, true)
-                    else -> SourceExporter.buildJson(items, false)
+                    group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(pool, false, true)
+                    group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(pool, true)
+                    else -> SourceExporter.buildJson(pool, false)
                 }
                 if (json == "[]") {
                     toast("按当前筛选没有可导出的书源")
@@ -388,19 +491,20 @@ class MainActivity : AppCompatActivity() {
             }
             .setNeutralButton("保存到文件夹") { _, _ ->
                 val json = when {
-                    group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(items, false, true)
-                    group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(items, true)
-                    else -> SourceExporter.buildJson(items, false)
+                    group.checkedRadioButtonId == rbDead.id -> SourceExporter.buildJson(pool, false, true)
+                    group.checkedRadioButtonId == rbOkUncertain.id -> SourceExporter.buildJson(pool, true)
+                    else -> SourceExporter.buildJson(pool, false)
                 }
                 if (json == "[]") {
                     toast("按当前筛选没有可导出的书源")
                     return@setNeutralButton
                 }
                 val label = if (group.checkedRadioButtonId == rbDead.id) "失效书源" else "可用书源"
+                val exportLabel = if (activeGroup != null) "${activeGroup.label}-$label" else label
                 pendingExportJson = json
-                pendingExportLabel = label
+                pendingExportLabel = exportLabel
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                createExportFile.launch("${label}_$stamp.json")
+                createExportFile.launch("${exportLabel}_$stamp.json")
             }
             .setNegativeButton("取消", null)
             .show()
@@ -408,6 +512,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSourceDetail(item: SourceItem) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val idx = CheckManager.items.value.indexOfFirst { it === item }
         MaterialAlertDialogBuilder(this)
             .setTitle(item.name)
             .setMessage(
@@ -421,13 +526,52 @@ class MainActivity : AppCompatActivity() {
                     if (item.elapsedMs > 0) {
                         append("\n耗时：").append(item.elapsedMs).append(" ms")
                     }
+                    append("\n分组：").append(item.group.label)
                 }
             )
             .setNeutralButton("复制该书源") { _, _ ->
                 clipboard.setPrimaryClip(ClipData.newPlainText("书源", item.json.toString()))
                 toast("已复制")
             }
+            .setNegativeButton("改分组") { _, _ ->
+                if (idx < 0) {
+                    toast("书源状态已变化，请重试")
+                } else {
+                    showGroupDialog(item, idx)
+                }
+            }
             .setPositiveButton("查看完整 JSON", null)
+            .show()
+    }
+
+    private fun showGroupDialog(item: SourceItem, index: Int) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 0, 48, 8)
+        }
+        val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        val radios = SourceGroup.entries.map { g ->
+            RadioButton(this).apply {
+                text = g.label
+                isChecked = g == item.group
+                id = android.view.View.generateViewId()
+                setOnClickListener {
+                    val chosen = SourceGroup.entries.firstOrNull { it.label == text.toString() } ?: SourceGroup.OTHER
+                    CheckManager.updateItem(index, item.copy(group = chosen))
+                    AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "手动改分组：${item.name} -> ${chosen.label}")
+                    updateSummary(CheckManager.items.value)
+                    toast("已设为「${chosen.label}」")
+                }
+            }
+        }
+        radios.forEach { group.addView(it) }
+        container.addView(group)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("设置分组")
+            .setMessage("分组仅用于本 App 筛选与分类导出，不会改动原始书源 JSON。")
+            .setView(container)
+            .setPositiveButton("完成", null)
+            .setNegativeButton("取消", null)
             .show()
     }
 

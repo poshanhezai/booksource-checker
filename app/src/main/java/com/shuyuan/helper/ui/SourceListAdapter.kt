@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.shuyuan.helper.R
+import com.shuyuan.helper.data.SourceGroup
 import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceState
 import com.shuyuan.helper.databinding.ItemSourceBinding
@@ -28,6 +29,16 @@ class SourceListAdapter(
             notifyDataSetChanged()
         }
 
+    /** null 表示显示全部分组 */
+    var groupFilter: SourceGroup? = null
+        set(value) {
+            field = value
+            notifyDataSetChanged()
+        }
+
+    private fun visibleItems(): List<SourceItem> =
+        all.filter { filter.match(it.state) && (groupFilter == null || it.group == groupFilter) }
+
     fun submit(list: List<SourceItem>) {
         all.clear()
         all.addAll(list)
@@ -40,11 +51,11 @@ class SourceListAdapter(
     }
 
     override fun getItemCount(): Int {
-        return all.count { filter.match(it.state) }
+        return visibleItems().size
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val item = all.filter { filter.match(it.state) }[position]
+        val item = visibleItems()[position]
         holder.bind(item)
     }
 

@@ -70,7 +70,8 @@ object SourceImporter {
                 continue
             }
             val type = runCatching { obj.get("bookSourceType").asInt }.getOrDefault(0)
-            items.add(SourceItem(json = obj, name = name, url = url, host = host, type = type))
+            val group = detectGroup(obj, name, url, type)
+            items.add(SourceItem(json = obj, name = name, url = url, host = host, type = type, group = group))
         }
         val message = if (items.isEmpty()) "没有解析出可检测的书源" else ""
         return ImportResult(items, skipped, message)
@@ -92,6 +93,43 @@ object SourceImporter {
             if (host.isBlank() || !host.contains('.')) null else host.lowercase()
         }.getOrNull()
     }
+
+    /**
+     * 自动判断书源分组。规则优先级：成人 > 音频 > 漫画 > 小说/其他。
+     * 优先看 bookSourceGroup / 名称里的关键词，再按 Legado 类型兜底。
+     */
+    private fun detectGroup(obj: JsonObject, name: String, url: String, type: Int): SourceGroup {
+        val hay = buildString {
+            append(stringOf(obj, "bookSourceGroup", "group")).append('\n')
+            append(name).append('\n')
+            append(url).append('\n')
+            append(stringOf(obj, "bookSourceComment"))
+        }.lowercase()
+
+        if (audioKeys.any { hay.contains(it) } || type == 1) return SourceGroup.AUDIO
+        if (adultKeys.any { hay.contains(it) }) return SourceGroup.ADULT
+        if (comicKeys.any { hay.contains(it) }) return SourceGroup.COMIC
+        return when (type) {
+            1 -> SourceGroup.AUDIO
+            2 -> SourceGroup.COMIC
+            3, 4 -> SourceGroup.OTHER
+            else -> SourceGroup.NOVEL
+        }
+    }
+
+    private val audioKeys = listOf(
+        "听书", "听小说", "有声", "音频", "广播剧", "audiobook"
+    )
+
+    private val adultKeys = listOf(
+        "成人", "色情", "小黄文", "黄文", "肉文", "h漫", "里番", "18x",
+        "18禁", "r18", "r-18", "porn", "adult", "成人小说", "成人漫画", "黄书"
+    )
+
+    private val comicKeys = listOf(
+        "漫画", "动漫", "manga", "manhua", "comic", "comics", "看漫画",
+        "漫画屋", "dm5", "绅士", "本子"
+    )
 
     /** 将导入结果保存为原始 JSON 文本，供前台服务重新读取 */
     fun toRawText(items: List<SourceItem>): String {

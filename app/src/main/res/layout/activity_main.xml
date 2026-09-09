@@ -147,6 +147,79 @@
             app:chipMinHeight="32dp" />
     </com.google.android.material.chip.ChipGroup>
 
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/groupFilterGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="12dp"
+        android:paddingBottom="2dp"
+        app:checkedChip="@id/btnGroupAll"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupAll"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_all"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupNovel"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_novel"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupComic"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_comic"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupAdult"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_adult"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupAudio"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_audio"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/btnGroupOther"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/group_other"
+            android:textSize="12sp"
+            app:checkedIconVisible="false"
+            app:chipMinHeight="28dp" />
+    </com.google.android.material.chip.ChipGroup>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvSources"
         android:layout_width="match_parent"

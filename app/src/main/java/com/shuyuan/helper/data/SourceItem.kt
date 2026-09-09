@@ -2,6 +2,19 @@ package com.shuyuan.helper.data
 
 import com.google.gson.JsonObject
 
+enum class SourceGroup(val label: String) {
+    NOVEL("小说"),
+    COMIC("漫画"),
+    ADULT("成人"),
+    AUDIO("音频"),
+    OTHER("其他");
+
+    companion object {
+        fun ofLabel(label: String): SourceGroup? =
+            entries.firstOrNull { it.label == label }
+    }
+}
+
 enum class SourceState(val label: String) {
     PENDING("等待检测"),
     CHECKING("检测中"),
@@ -27,7 +40,8 @@ data class SourceItem(
     val detail: String = "尚未检测",
     val httpCode: Int = 0,
     val elapsedMs: Long = -1L,
-    val searchTried: Boolean = false
+    val searchTried: Boolean = false,
+    val group: SourceGroup = SourceGroup.NOVEL
 ) {
     val checked: Boolean
         get() = state != SourceState.PENDING && state != SourceState.CHECKING

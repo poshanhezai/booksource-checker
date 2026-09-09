@@ -6,6 +6,8 @@
     <string name="open_log">日志</string>
     <string name="paste_import">粘贴 JSON</string>
     <string name="file_import">选择文件</string>
+    <string name="multi_file_import">多选文件合并导入</string>
+    <string name="clear_list">清空列表</string>
     <string name="start_check">开始检测</string>
     <string name="stop_check">停止检测</string>
     <string name="export">导出</string>
@@ -36,6 +38,12 @@
     <string name="filter_ok">可用</string>
     <string name="filter_uncertain">疑似</string>
     <string name="filter_dead">失效</string>
+    <string name="group_all">全部分组</string>
+    <string name="group_novel">小说</string>
+    <string name="group_comic">漫画</string>
+    <string name="group_adult">成人</string>
+    <string name="group_audio">音频</string>
+    <string name="group_other">其他</string>
     <string name="import_title">粘贴书源 JSON</string>
     <string name="import_hint">支持直接粘贴“1567个书源.json”这类数组内容；也可以选择文件导入。</string>
     <string name="start_confirm">开始批量检测</string>
