@@ -6,12 +6,19 @@ package com.shuyuan.helper.net
  */
 object AdultContentSniffer {
 
-    private val markers = listOf(
-        "成人小说", "成人漫画", "成人文学", "成人内容", "成人网站", "成人视频",
+    /** 出现一次基本就能说明是成人内容的强特征 */
+    private val strongMarkers = listOf(
+        "成人小说", "成人漫画", "成人文学", "成人网站", "成人视频", "成人内容",
+        "成人专区", "成人限定", "成人阅读", "成人频道",
         "色情小说", "色情漫画", "色情文学", "色情网站", "情色文学", "情色小说",
-        "黄色小说", "小黄文", "黄文", "肉文", "np文", "h漫", "里番", "本子",
-        "无码", "有码", "porn", "r18", "18禁", "十八禁", "av资源", "av在线",
-        "未成年禁止", "未满18", "成人限定", "成人专区", "成人阅读"
+        "黄色小说", "小黄文", "黄文", "黄书", "肉文", "np文", "h漫", "里番",
+        "无码", "有码", "porn", "18禁", "十八禁", "av资源", "av在线"
+    )
+
+    /** 弱特征：单独出现可能是广告或偶尔提及，至少命中两条才判定 */
+    private val weakMarkers = listOf(
+        "成人", "色情", "情色", "r18", "未成年禁止", "未满18", "本子",
+        "大尺度", "限制级"
     )
 
     /** 返回命中的特征词（最多 3 个）；没命中返回空列表。 */
@@ -22,6 +29,9 @@ object AdultContentSniffer {
             .replace(Regex("&[a-zA-Z#0-9]+;"), " ")
             .replace(Regex("\\s+"), " ")
             .lowercase()
-        return markers.filter { cleaned.contains(it) }.take(3)
+        val strong = strongMarkers.filter { cleaned.contains(it) }
+        if (strong.isNotEmpty()) return strong.take(3)
+        val weak = weakMarkers.filter { cleaned.contains(it) }
+        return if (weak.size >= 2) weak.take(3) else emptyList()
     }
 }

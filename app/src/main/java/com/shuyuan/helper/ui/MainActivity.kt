@@ -301,8 +301,8 @@ class MainActivity : AppCompatActivity() {
                     binding.btnImport.isEnabled = !running
                     binding.btnOpenGenerator.isEnabled = !running
                     binding.btnOpenLog.isEnabled = !running
-                    binding.btnStop.isVisible = running
-                    binding.btnExport.isVisible = !running
+                    binding.btnStop.visibility = if (running) android.view.View.VISIBLE else android.view.View.INVISIBLE
+                    binding.btnExport.visibility = if (running) android.view.View.INVISIBLE else android.view.View.VISIBLE
                     binding.progressBar.isVisible = running
                     binding.btnStart.text = getString(
                         when {

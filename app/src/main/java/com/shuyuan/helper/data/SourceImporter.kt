@@ -95,8 +95,8 @@ object SourceImporter {
     }
 
     /**
-     * 自动判断书源分组。成人包含“明确成人”与“疑似成人”线索；
-     * 更精确的判断还会在检测时访问页面正文（见 AdultContentSniffer）。
+     * 自动判断书源分组。只根据明确成人线索归入「成人」，
+     * 避免 Telegram/敏感资源等站群通用标签误判；更精确的判断交给检测时页面内容识别。
      * 规则优先级：成人 > 音频 > 漫画 > 小说/其他。
      * 优先看 bookSourceGroup / 名称里的关键词，再按 Legado 类型兜底。
      */
@@ -109,9 +109,7 @@ object SourceImporter {
         }.lowercase()
 
         if (audioKeys.any { hay.contains(it) } || type == 1) return SourceGroup.AUDIO
-        if (adultKeys.any { hay.contains(it) } || suspectAdultKeys.any { hay.contains(it) }) {
-            return SourceGroup.ADULT
-        }
+        if (adultKeys.any { hay.contains(it) }) return SourceGroup.ADULT
         if (comicKeys.any { hay.contains(it) }) return SourceGroup.COMIC
         return when (type) {
             1 -> SourceGroup.AUDIO
@@ -128,10 +126,6 @@ object SourceImporter {
     private val adultKeys = listOf(
         "成人", "色情", "小黄文", "黄文", "肉文", "h漫", "里番", "18x",
         "18禁", "r18", "r-18", "porn", "adult", "成人小说", "成人漫画", "黄书"
-    )
-
-    private val suspectAdultKeys = listOf(
-        "敏感资源", "t.me", "telegram", "同人", "耽美", "腐向", "np", "本子", "绅士"
     )
 
     private val comicKeys = listOf(
