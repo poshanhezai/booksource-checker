@@ -302,8 +302,11 @@ class MainActivity : AppCompatActivity() {
                     binding.btnImport.isEnabled = !running
                     binding.btnOpenGenerator.isEnabled = !running
                     binding.btnOpenLog.isEnabled = !running
-                    binding.btnStop.visibility = if (running) android.view.View.VISIBLE else android.view.View.INVISIBLE
-                    binding.btnExport.visibility = if (running) android.view.View.INVISIBLE else android.view.View.VISIBLE
+                    binding.btnStop.isEnabled = running
+                    binding.btnExport.isEnabled = false
+                    if (!running) {
+                        updateSummary(CheckManager.items.value)
+                    }
                     binding.progressBar.isVisible = running
                     binding.btnStart.text = getString(
                         when {
@@ -343,6 +346,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvSummary.text = "尚未导入书源，可导入 JSON 或文本文件"
             binding.tvStats.visibility = android.view.View.GONE
             binding.btnExport.isEnabled = false
+            binding.btnStop.isEnabled = CheckManager.running.value
             return
         }
         val activeGroup = adapter.groupFilter
@@ -354,10 +358,11 @@ class MainActivity : AppCompatActivity() {
         val pending = pool.count { !it.checked }
         binding.tvSummary.text = "$groupText · ${pool.size} 个书源（共 ${items.size} 个）"
         binding.tvStats.visibility = android.view.View.VISIBLE
-        binding.tvStats.text =
-            "可用 $ok   疑似 $uncertain   失效 $dead   待检 $pending"
-        binding.btnExport.isEnabled = pool.any { it.checked }
-        binding.btnStart.isEnabled = currentImportFile != null && !CheckManager.running.value
+            binding.tvStats.text =
+                "可用 $ok   疑似 $uncertain   失效 $dead   待检 $pending"
+        binding.btnExport.isEnabled = !CheckManager.running.value && pool.any { it.checked }
+        binding.btnStop.isEnabled = CheckManager.running.value
+        binding.btnStart.isEnabled = CheckManager.running.value || currentImportFile != null
     }
 
     private fun showImportOptions() {
