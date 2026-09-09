@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">书源体检</string>
+    <string name="app_name">书源助手</string>
     <string name="action_import">导入</string>
+    <string name="open_generator">生成书源</string>
     <string name="paste_import">粘贴 JSON</string>
     <string name="file_import">选择文件</string>
-    <string name="url_generate">网址自动生成</string>
-    <string name="url_generate_title">网址生成书源初稿（试验版）</string>
     <string name="start_check">开始检测</string>
     <string name="stop_check">停止检测</string>
     <string name="export">导出</string>
+    <string name="generator_back">返回检测</string>
+    <string name="generator_title">生成书源</string>
+    <string name="generator_subtitle">输入网站首页 / 搜索页，自动推断搜索地址与列表规则，生成 Legado 书源初稿。</string>
+    <string name="generator_url_label">网站地址</string>
+    <string name="generator_url_hint">例如 https://example.com 或其搜索页</string>
+    <string name="generator_keyword_label">测试关键词（可留空，默认“我”）</string>
+    <string name="generator_action">生成初稿</string>
+    <string name="generator_working">正在抓取页面并分析，通常需要几秒…</string>
+    <string name="generator_ok">生成完成</string>
+    <string name="generator_add">加入检测列表</string>
+    <string name="generator_copy">复制 JSON</string>
+    <string name="generator_tip">说明：自动推断只覆盖搜索和列表规则（ruleSearch），目录/正文规则暂未自动生成；登录、验证码、JS 动态加载的站点可能失败。</string>
     <string name="check_quick">快速检测</string>
     <string name="check_standard">标准检测</string>
     <string name="filter_all">全部</string>
