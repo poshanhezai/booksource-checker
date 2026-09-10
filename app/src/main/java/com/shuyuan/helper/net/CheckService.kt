@@ -45,8 +45,26 @@ class CheckService : Service() {
                 val path = intent.getStringExtra(EXTRA_PATH)
                 if (path != null) {
                     val settings = intent.settings()
-                    startForeground(ID, notification("正在准备书源…"))
+                    try {
+                        startForeground(ID, notification("正在准备书源…"))
+                    } catch (e: Exception) {
+                        AppLog.error(
+                            AppLog.Tag.COMPAT,
+                            "前台服务启动失败：系统可能限制后台服务（设备=${android.os.Build.MANUFACTURER}/${android.os.Build.MODEL}）",
+                            e
+                        )
+                        CheckManager.setRunning(false)
+                        CheckManager.updateProgress(0, 0, "", "系统禁止后台检测服务，请改用「应用内检测」")
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
                     CheckManager.setRunning(true)
+                    AppLog.append(
+                        AppLog.Tag.CHECK,
+                        "启动前台检测服务：模式=${settings.mode.label} 并发=${settings.concurrency} " +
+                            "超时=${settings.timeoutSec}s 内容识别=${settings.adultInspect} " +
+                            "自定义词数=${settings.customAdultKeywords.split(',', '，', '\n').count { it.isNotBlank() }}"
+                    )
                     job?.cancel()
                     job = scope.launch {
                         runCheck(path, settings)
@@ -55,16 +73,19 @@ class CheckService : Service() {
             }
 
             ACTION_STOP -> {
+                AppLog.append(AppLog.Tag.CHECK, "收到停止检测指令")
                 job?.cancel()
                 finish(stoppedByUser = true)
             }
 
             ACTION_PAUSE -> {
+                AppLog.append(AppLog.Tag.CHECK, "收到暂停检测指令")
                 CheckManager.setPaused(true)
                 notificationManager.notify(ID, notification("检测已暂停"))
             }
 
             ACTION_RESUME -> {
+                AppLog.append(AppLog.Tag.CHECK, "收到继续检测指令")
                 CheckManager.setPaused(false)
                 notificationManager.notify(ID, notification("检测继续中"))
             }
@@ -74,8 +95,13 @@ class CheckService : Service() {
 
     private suspend fun runCheck(path: String, settings: CheckSettings) {
         val parsed = withContext(Dispatchers.IO) {
-            val text = File(path).readText()
-            SourceImporter.parse(text)
+            try {
+                val text = File(path).readText()
+                SourceImporter.parse(text)
+            } catch (e: Exception) {
+                AppLog.error(AppLog.Tag.CHECK, "读取/解析导入文件失败：$path", e)
+                throw e
+            }
         }
         if (parsed.items.isEmpty()) {
             AppLog.append(this, AppLog.Tag.CHECK, "检测启动失败：导入内容无法解析或没有可检测书源")
@@ -86,6 +112,7 @@ class CheckService : Service() {
         CheckManager.importFile = path
         val items = parsed.items
         val total = items.size
+        AppLog.append(AppLog.Tag.CHECK, "开始检测 $total 个书源")
         CheckManager.replaceAll(items, "共 $total 个书源，开始${settings.mode.label}…")
 
         try {
@@ -104,7 +131,7 @@ class CheckService : Service() {
             AppLog.append(this, AppLog.Tag.CHECK, "检测已停止")
             CheckManager.updateProgress(0, 0, "", "检测已停止")
         } catch (e: Exception) {
-            AppLog.append(this, AppLog.Tag.CHECK, "检测出错：${e.message}")
+            AppLog.error(AppLog.Tag.CHECK, "检测运行异常", e)
             CheckManager.updateProgress(0, 0, "", "检测出错：${e.message}")
         } finally {
             finish()
@@ -118,6 +145,21 @@ class CheckService : Service() {
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    override fun onTimeout(startId: Int) {
+        AppLog.warn(AppLog.Tag.COMPAT, "前台服务 onTimeout(startId=$startId)，自动停止")
+        CheckManager.updateProgress(0, 0, "", "系统要求前台服务停止，检测已中断")
+        finish(stoppedByUser = true)
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        AppLog.warn(
+            AppLog.Tag.COMPAT,
+            "前台服务超时：startId=$startId fgsType=$fgsType（Android 15+ 限制）"
+        )
+        CheckManager.updateProgress(0, 0, "", "前台服务超时，检测已中断；下次可改用应用内检测")
+        finish(stoppedByUser = true)
     }
 
     private fun createChannel() {
@@ -154,6 +196,7 @@ class CheckService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        AppLog.append(AppLog.Tag.CHECK, "检测服务已销毁")
         job?.cancel()
         scope.cancel()
     }

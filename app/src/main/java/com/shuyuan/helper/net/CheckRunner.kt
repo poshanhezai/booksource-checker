@@ -3,6 +3,7 @@ package com.shuyuan.helper.net
 import com.shuyuan.helper.data.CheckManager
 import com.shuyuan.helper.data.CheckMode
 import com.shuyuan.helper.data.CheckSettings
+import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceGroup
 import com.shuyuan.helper.data.SourceState
@@ -19,6 +20,11 @@ import java.util.concurrent.ConcurrentHashMap
 object CheckRunner {
 
     suspend fun run(items: List<SourceItem>, settings: CheckSettings) {
+        AppLog.append(
+            AppLog.Tag.CHECK,
+            "检测参数：模式=${settings.mode.label} 数量=${items.size} 并发=${settings.concurrency} " +
+                "超时=${settings.timeoutSec}s 关键词=${settings.keyword} 内容识别=${settings.adultInspect}"
+        )
         val engine = ProbeEngine(settings)
         val semaphore = Semaphore(settings.concurrency.coerceAtLeast(1))
         val hostProbes = ConcurrentHashMap<String, CompletableDeferred<ProbeResult>>()
@@ -45,7 +51,23 @@ object CheckRunner {
                             if (hits.isNotEmpty()) {
                                 group = SourceGroup.ADULT
                                 detail = "${result.message}\n[主动访问识别] 命中特征：${hits.joinToString("、")}"
+                                AppLog.append(
+                                    AppLog.Tag.CHECK,
+                                    "内容识别命中：${source.name} [${source.url}] -> ${hits.joinToString("、")}"
+                                )
                             }
+                        }
+                        if (result.state == SourceState.DEAD) {
+                            AppLog.warn(
+                                AppLog.Tag.CHECK,
+                                "检测失败：${source.name} [${source.url}] HTTP=${result.httpCode} " +
+                                    "耗时=${result.elapsedMs}ms 原因=${result.message}"
+                            )
+                        } else if (result.state == SourceState.UNCERTAIN) {
+                            AppLog.append(
+                                AppLog.Tag.CHECK,
+                                "疑似可用：${source.name} [${source.url}] ${result.message}"
+                            )
                         }
                         CheckManager.updateItem(
                             index,

@@ -40,6 +40,7 @@
     <string name="start_adult_inspect">成人识别：检测时会主动访问页面/搜索结果正文判断，不只看标题</string>
     <string name="start_custom_adult_keywords">自定义关键词（可选，多个用逗号或换行分隔）</string>
     <string name="start_custom_adult_hint">例如：腐、PO18、污书、欲望（命中任意一个即归入成人）</string>
+    <string name="start_compat_mode">兼容模式：应用内检测（红米/HyperOS 建议开启，检测时请保持本页面打开）</string>
     <string name="filter_all">全部</string>
     <string name="filter_ok">可用</string>
     <string name="filter_uncertain">疑似</string>

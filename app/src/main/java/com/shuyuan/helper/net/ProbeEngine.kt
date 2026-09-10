@@ -1,6 +1,7 @@
 package com.shuyuan.helper.net
 
 import com.google.gson.JsonObject
+import com.shuyuan.helper.data.AppLog
 import com.shuyuan.helper.data.CheckSettings
 import com.shuyuan.helper.data.SourceState
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,10 @@ class ProbeEngine(private val settings: CheckSettings) {
                 classifyHttp(resp.code, text, size, elapsed)
             }
         } catch (e: Exception) {
+            AppLog.warn(
+                AppLog.Tag.CHECK,
+                "站点请求异常 url=$urlInput type=${e.javaClass.simpleName} message=${e.message}"
+            )
             ProbeResult(SourceState.DEAD, exceptionMessage(e), elapsedMs = System.currentTimeMillis() - started)
         }
     }
@@ -137,6 +142,10 @@ class ProbeEngine(private val settings: CheckSettings) {
                     )
                 }
             } catch (e: Exception) {
+                AppLog.warn(
+                    AppLog.Tag.CHECK,
+                    "搜索请求异常 type=${e.javaClass.simpleName} message=${e.message}"
+                )
                 SearchAttempt(
                     supported = true,
                     result = ProbeResult(
@@ -195,7 +204,8 @@ class ProbeEngine(private val settings: CheckSettings) {
                 total += n
                 if (total >= settings.maxBodyBytes) break
             }
-        } catch (_: IOException) {
+        } catch (e: IOException) {
+            AppLog.warn(AppLog.Tag.CHECK, "读取响应中断：${e.message}")
         }
         val raw = out.toByteArray()
         return decodePreview(raw, resp, preferredCharset) to raw.size

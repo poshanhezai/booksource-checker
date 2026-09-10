@@ -34,7 +34,10 @@ import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceState
 import com.shuyuan.helper.databinding.ActivityMainBinding
 import com.shuyuan.helper.net.CheckService
+import com.shuyuan.helper.net.CheckRunner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: SourceListAdapter
     private var currentImportFile: File? = null
     private var startAfterPermission = false
+    private var inAppJob: Job? = null
     private var pendingExportJson: String? = null
     private var pendingExportLabel: String? = null
 
@@ -157,12 +161,22 @@ class MainActivity : AppCompatActivity() {
             when {
                 CheckManager.running.value && CheckManager.paused.value -> {
                     AppLog.append(this, AppLog.Tag.CHECK, "继续批量检测")
-                    CheckService.resume(this)
+                    if (inAppJob?.isActive == true) {
+                        CheckManager.setPaused(false)
+                        updateSummary(CheckManager.items.value)
+                    } else {
+                        CheckService.resume(this)
+                    }
                 }
 
                 CheckManager.running.value -> {
                     AppLog.append(this, AppLog.Tag.CHECK, "暂停批量检测")
-                    CheckService.pause(this)
+                    if (inAppJob?.isActive == true) {
+                        CheckManager.setPaused(true)
+                        updateSummary(CheckManager.items.value)
+                    } else {
+                        CheckService.pause(this)
+                    }
                 }
 
                 else -> ensureNotificationPermissionAndStart()
@@ -170,7 +184,14 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnStop.setOnClickListener {
             AppLog.append(this, AppLog.Tag.CHECK, "用户停止批量检测")
-            CheckService.stop(this)
+            if (inAppJob?.isActive == true) {
+                inAppJob?.cancel()
+                CheckManager.setRunning(false)
+                CheckManager.updateProgress(0, 0, "", "检测已停止")
+                binding.root.keepScreenOn = false
+            } else {
+                CheckService.stop(this)
+            }
         }
         binding.btnExport.setOnClickListener { showExportDialog() }
         binding.btnSelectAll.setOnClickListener { adapter.selectAllVisible() }
@@ -627,6 +648,11 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, (resources.displayMetrics.density * 4).toInt(), 0, 0)
         }
         container.addView(customInput)
+        val compatCheck = android.widget.CheckBox(this).apply {
+            text = getString(R.string.start_compat_mode)
+            isChecked = isXiaomiDevice()
+        }
+        container.addView(compatCheck)
         MaterialAlertDialogBuilder(this)
             .setTitle("开始批量检测")
             .setMessage("共 $count 个书源。检测会在前台通知中持续进行，期间请保持网络畅通。")
@@ -641,10 +667,74 @@ class MainActivity : AppCompatActivity() {
                     customAdultKeywords = customInput.text?.toString().orEmpty()
                 )
                 AppLog.append(this, AppLog.Tag.CHECK, "开始批量检测：${mode.label}，共 $count 个书源")
-                CheckService.start(this, currentImportFile!!.absolutePath, settings)
+                val path = currentImportFile!!.absolutePath
+                if (compatCheck.isChecked) {
+                    startInAppCheck(path, settings)
+                } else {
+                    CheckService.start(this, path, settings)
+                }
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun isXiaomiDevice(): Boolean {
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        val brand = Build.BRAND.lowercase()
+        return manufacturer.contains("xiaomi") || manufacturer.contains("redmi") ||
+            brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco")
+    }
+
+    /**
+     * 应用内检测：不启动前台服务，直接在当前进程跑检测。
+     * 用于 HyperOS / MIUI 等对后台服务限制较严的机型。
+     */
+    private fun startInAppCheck(path: String, settings: CheckSettings) {
+        val device = "${Build.MANUFACTURER}/${Build.BRAND}/${Build.MODEL} Android ${Build.VERSION.RELEASE}"
+        AppLog.append(AppLog.Tag.COMPAT, "启用应用内检测模式：设备=$device 模式=${settings.mode.label}")
+        inAppJob?.cancel()
+        inAppJob = lifecycleScope.launch {
+            binding.root.keepScreenOn = true
+            try {
+                val parsed = withContext(Dispatchers.IO) {
+                    SourceImporter.parse(File(path).readText())
+                }
+                if (parsed.items.isEmpty()) {
+                    AppLog.warn(AppLog.Tag.COMPAT, "应用内检测失败：导入内容无法解析")
+                    CheckManager.updateProgress(0, 0, "", "导入内容无法解析或没有可检测书源")
+                    return@launch
+                }
+                val items = parsed.items
+                val total = items.size
+                CheckManager.importFile = path
+                CheckManager.setRunning(true)
+                CheckManager.replaceAll(items, "共 $total 个书源，开始${settings.mode.label}（应用内）…")
+                AppLog.append(AppLog.Tag.CHECK, "应用内检测开始：共 $total 个")
+                withContext(Dispatchers.Default) {
+                    CheckRunner.run(items, settings)
+                }
+                val now = CheckManager.items.value
+                val ok = now.count { it.state == SourceState.OK }
+                val uncertain = now.count { it.state == SourceState.UNCERTAIN }
+                val dead = now.count { it.state == SourceState.DEAD }
+                AppLog.append(
+                    AppLog.Tag.CHECK,
+                    "应用内检测完成：共 $total 个，可用 $ok 疑似 $uncertain 失效 $dead"
+                )
+                CheckManager.updateProgress(total, total, "", "检测完成：$total 个书源已处理")
+            } catch (e: CancellationException) {
+                AppLog.append(AppLog.Tag.CHECK, "应用内检测被用户停止")
+                CheckManager.updateProgress(0, 0, "", "检测已停止")
+            } catch (e: Exception) {
+                AppLog.error(AppLog.Tag.CHECK, "应用内检测运行异常", e)
+                CheckManager.updateProgress(0, 0, "", "检测出错：${e.message}")
+            } finally {
+                binding.root.keepScreenOn = false
+                CheckManager.setPaused(false)
+                CheckManager.setRunning(false)
+                inAppJob = null
+            }
+        }
     }
 
     private fun showExportDialog() {

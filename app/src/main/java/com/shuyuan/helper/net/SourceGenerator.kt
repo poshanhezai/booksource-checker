@@ -1,6 +1,7 @@
 package com.shuyuan.helper.net
 
 import com.google.gson.JsonObject
+import com.shuyuan.helper.data.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -324,7 +325,8 @@ object SourceGenerator {
                 val doc = parse(bytes, finalUrl, resp.header("Content-Type"))
                 FetchedPage(status, finalUrl, doc, bytes)
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLog.error(AppLog.Tag.GENERATE, "抓取页面失败：$url", e)
             null
         }
     }
@@ -352,7 +354,12 @@ object SourceGenerator {
                 val finalUrl = resp.request.url.toString()
                 FetchedPage(status, finalUrl, parse(bytes, finalUrl, resp.header("Content-Type")), bytes)
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLog.error(
+                AppLog.Tag.GENERATE,
+                "生成书源搜索请求失败：${search.requestUrl}",
+                e
+            )
             null
         }
     }
