@@ -32,9 +32,11 @@ import com.shuyuan.helper.data.SourceGroup
 import com.shuyuan.helper.data.SourceImporter
 import com.shuyuan.helper.data.SourceItem
 import com.shuyuan.helper.data.SourceState
+import com.shuyuan.helper.data.SourceStore
 import com.shuyuan.helper.databinding.ActivityMainBinding
 import com.shuyuan.helper.net.CheckService
 import com.shuyuan.helper.net.CheckRunner
+import com.shuyuan.helper.net.ImportFetcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -142,6 +144,18 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         currentImportFile = CheckManager.importFile?.let { File(it) }
 
+        lifecycleScope.launch {
+            if (CheckManager.items.value.isEmpty()) {
+                val loaded = withContext(Dispatchers.IO) { SourceStore.load(this@MainActivity) }
+                if (loaded.isNotEmpty()) {
+                    val f = SourceStore.file(this@MainActivity)
+                    currentImportFile = f
+                    CheckManager.importFile = f.absolutePath
+                    CheckManager.replaceAll(loaded, "已载入 ${loaded.size} 个书源")
+                }
+            }
+        }
+
         binding.rvSources.layoutManager = LinearLayoutManager(this)
         adapter = SourceListAdapter(
             onClick = { showSourceDetail(it) },
@@ -197,6 +211,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnSelectAll.setOnClickListener { adapter.selectAllVisible() }
         binding.btnCancelSelect.setOnClickListener { exitMultiSelect() }
         binding.btnDeleteSelected.setOnClickListener { confirmDeleteSelected() }
+        binding.btnMoreSelect.setOnClickListener { showSelectionMoreDialog() }
         setupFilter()
         setupGroupFilter()
         observeState()
@@ -398,6 +413,7 @@ class MainActivity : AppCompatActivity() {
                     getString(R.string.paste_import),
                     getString(R.string.file_import),
                     getString(R.string.multi_file_import),
+                    getString(R.string.network_import),
                     getString(R.string.deduplicate_sources),
                     getString(R.string.clear_list)
                 )
@@ -406,8 +422,9 @@ class MainActivity : AppCompatActivity() {
                     0 -> showPasteDialog()
                     1 -> openFile.launch(arrayOf("*/*"))
                     2 -> openMultipleFiles.launch(arrayOf("*/*"))
-                    3 -> showDedupeDialog()
-                    4 -> showClearListDialog()
+                    3 -> showNetworkImportDialog()
+                    4 -> showDedupeDialog()
+                    5 -> showClearListDialog()
                 }
             }
             .setNegativeButton("取消", null)
@@ -548,6 +565,144 @@ class MainActivity : AppCompatActivity() {
             AppLog.append(this@MainActivity, AppLog.Tag.IMPORT, "书源去重：删除 $removed 个重复，剩余 ${keep.size} 个")
             updateSummary(keep)
             toast("已删除 $removed 个重复书源")
+        }
+    }
+
+    private fun showNetworkImportDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.network_import_hint)
+            textSize = 14f
+            minLines = 1
+        }
+        val pad = (resources.displayMetrics.density * 16).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+        }
+        container.addView(input)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.network_import_title))
+            .setMessage("支持直接下载 JSON / TXT 书源文件，下载后会自动追加到当前列表并写入日志。")
+            .setView(container)
+            .setPositiveButton("下载并导入") { _, _ ->
+                val url = input.text?.toString().orEmpty().trim()
+                if (url.isBlank()) {
+                    toast("请输入网址")
+                    return@setPositiveButton
+                }
+                startNetworkImport(url)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun startNetworkImport(url: String) {
+        val loading = MaterialAlertDialogBuilder(this)
+            .setTitle("正在网络导入")
+            .setMessage("正在下载：$url")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { ImportFetcher.fetch(url) }
+            runCatching { loading.dismiss() }
+            if (!result.ok) {
+                AppLog.warn(AppLog.Tag.IMPORT, "网络导入失败：$url -> ${result.message}")
+                toast(result.message)
+            } else {
+                importText(result.text)
+            }
+        }
+    }
+
+    private fun selectedItems(): List<SourceItem> =
+        CheckManager.items.value.filter { adapter.isSelected(it) }
+
+    private fun showSelectionMoreDialog() {
+        val count = adapter.selectedCount
+        if (count <= 0) {
+            toast("请先选择书源")
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("已选 $count 个书源")
+            .setItems(
+                arrayOf(
+                    getString(R.string.export_selected),
+                    getString(R.string.enable_selected),
+                    getString(R.string.disable_selected)
+                )
+            ) { _, which ->
+                when (which) {
+                    0 -> showExportSelectedDialog()
+                    1 -> setSelectedEnabled(true)
+                    2 -> setSelectedEnabled(false)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showExportSelectedDialog() {
+        val items = selectedItems()
+        if (items.isEmpty()) {
+            toast("没有选中的书源")
+            return
+        }
+        val json = SourceExporter.buildRawJson(items)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("导出所选书源")
+            .setMessage("已选中 ${items.size} 个书源，导出后可直接导入阅读 App。")
+            .setPositiveButton("分享") { _, _ ->
+                SourceExporter.share(this, json, "所选书源")
+                AppLog.append(this, AppLog.Tag.EXPORT, "导出所选书源：${items.size} 个（分享）")
+            }
+            .setNeutralButton("保存到文件夹") { _, _ ->
+                pendingExportJson = json
+                pendingExportLabel = "所选书源"
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                createExportFile.launch("所选书源_$stamp.json")
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun setSelectedEnabled(enabled: Boolean) {
+        val current = CheckManager.items.value
+        val selected = current.filter { adapter.isSelected(it) }
+        if (selected.isEmpty()) {
+            toast("没有选中的书源")
+            return
+        }
+        val updated = current.map { item ->
+            if (!adapter.isSelected(item)) {
+                item
+            } else {
+                val json = item.json.deepCopy()
+                json.addProperty("enabled", enabled)
+                item.copy(json = json)
+            }
+        }
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                val f = File(filesDir, "import_sources.json")
+                f.writeText(SourceImporter.toRawText(updated))
+                f
+            }
+            currentImportFile = file
+            CheckManager.importFile = file.absolutePath
+            CheckManager.replaceAll(
+                updated,
+                if (enabled) "已启用 ${selected.size} 个书源" else "已禁用 ${selected.size} 个书源"
+            )
+            AppLog.append(
+                this@MainActivity,
+                AppLog.Tag.IMPORT,
+                if (enabled) "批量启用书源：${selected.size} 个" else "批量禁用书源：${selected.size} 个"
+            )
+            adapter.exitSelectionMode()
+            updateSummary(updated)
+            toast(if (enabled) "已启用 ${selected.size} 个" else "已禁用 ${selected.size} 个")
         }
     }
 
