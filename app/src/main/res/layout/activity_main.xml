@@ -269,19 +269,6 @@
             android:textSize="13sp" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMoreSelect"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:minWidth="0dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="@string/select_more"
-            android:textSize="13sp" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDeleteSelected"
             style="@style/Widget.Material3.Button"
             android:layout_width="wrap_content"
