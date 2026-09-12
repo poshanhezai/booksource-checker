@@ -28,6 +28,13 @@ object SourceExporter {
         return Gson().toJson(arr)
     }
 
+    /** 选中导出：不按状态过滤，原样打包所选书源，保持 Legado 兼容 */
+    fun buildRawJson(items: List<SourceItem>): String {
+        val arr = JsonArray()
+        items.forEach { arr.add(it.json) }
+        return Gson().toJson(arr)
+    }
+
     fun share(context: Context, json: String, label: String): Boolean {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
